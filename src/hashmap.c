@@ -25,3 +25,8 @@ uint8_t get_string_hash8(unsigned char *string)
 {
     return get_string_hash(string) & 0xff;
 }
+
+uint8_t get_uint16_hash8(uint16_t value)
+{
+    return 0;
+}

@@ -15,7 +15,7 @@ layout(location = 0) out vec4 col;
 // main
 void main(){
     vec4 diffuse_tex_data;
-    if(use_diffuse_tex > 0){
+    if(use_diffuse_tex != 0){
         //vec2 uv = vec2(v_uv2.x + float((time >> 20) & 0xff) / 256.0, v_uv2.y);
         diffuse_tex_data = texture(diffuse_tex_sampler, v_uv2);
     }
@@ -24,6 +24,6 @@ void main(){
     }
     vec4 ka4 = unpackUnorm4x8(ka);
     vec4 kd4 = unpackUnorm4x8(kd);
-    vec3 ambient_light = kd4.xyz * 0.2f;
+    vec3 ambient_light = kd4.xyz;
     col = vec4(min(diffuse_tex_data.xyz * kd4.xyz * (lit + ambient_light * ka4.xyz) + spec , vec3(1.0f)), diffuse_tex_data.w);
 }

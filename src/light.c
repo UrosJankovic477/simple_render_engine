@@ -7,9 +7,9 @@
 
 void SRE_Light_push_uniform_array(sre_light *light, sre_program program)
 {
-    char *pos_string = malloc(64);
-    char *col_string = malloc(64);
-    char *rad_string = malloc(64);
+    char pos_string[64];
+    char col_string[64];
+    char rad_string[64];
 
     GLint pos_loc;
     GLint col_loc;
@@ -23,15 +23,12 @@ void SRE_Light_push_uniform_array(sre_light *light, sre_program program)
 
         sprintf(pos_string, "lights[%d].position", program.light_count);
         pos_loc = glGetUniformLocation(program.id, pos_string);
-        free(pos_string);
 
         sprintf(col_string, "lights[%d].color", program.light_count);
         col_loc = glGetUniformLocation(program.id, col_string);
-        free(col_string);
 
         sprintf(rad_string, "lights[%d].radius", program.light_count);
         rad_loc = glGetUniformLocation(program.id, rad_string);
-        free(rad_string);
 
         light->idx = program.light_count;
         program.light_count++;
@@ -42,15 +39,12 @@ void SRE_Light_push_uniform_array(sre_light *light, sre_program program)
         glm_vec3_normalize(light->position);
         sprintf(pos_string, "inf_lights[%d].position", program.inf_light_count);
         pos_loc = glGetUniformLocation(program.id, pos_string);
-        free(pos_string);
 
         sprintf(col_string, "inf_lights[%d].color", program.inf_light_count);
         col_loc = glGetUniformLocation(program.id, col_string);
-        free(col_string);
 
         sprintf(rad_string, "inf_lights[%d].radius", program.inf_light_count);
         rad_loc = glGetUniformLocation(program.id, rad_string);
-        free(rad_string);
 
         light->idx = program.inf_light_count;
         program.inf_light_count++;
@@ -64,9 +58,9 @@ void SRE_Light_push_uniform_array(sre_light *light, sre_program program)
 
 void SRE_Light_put_unifrorm_array(sre_light light, sre_program program)
 {
-    char *pos_string = malloc(64);
-    char *col_string = malloc(64);
-    char *rad_string = malloc(64);
+    char pos_string[64];
+    char col_string[64];
+    char rad_string[64];
 
     GLint pos_loc;
     GLint col_loc;
@@ -80,30 +74,24 @@ void SRE_Light_put_unifrorm_array(sre_light light, sre_program program)
 
         sprintf(pos_string, "lights[%d].position", light.idx);
         pos_loc = glGetUniformLocation(program.id, pos_string);
-        free(pos_string);
 
         sprintf(col_string, "lights[%d].color", light.idx);
         col_loc = glGetUniformLocation(program.id, col_string);
-        free(col_string);
 
         sprintf(rad_string, "lights[%d].radius", light.idx);
         rad_loc = glGetUniformLocation(program.id, rad_string);
-        free(rad_string);
     }
     else
     {
         glm_vec3_normalize(light.position);
         sprintf(pos_string, "inf_lights[%d].position", light.idx);
         pos_loc = glGetUniformLocation(program.id, pos_string);
-        free(pos_string);
 
         sprintf(col_string, "inf_lights[%d].color", light.idx);
         col_loc = glGetUniformLocation(program.id, col_string);
-        free(col_string);
 
         sprintf(rad_string, "inf_lights[%d].radius", light.idx);
         rad_loc = glGetUniformLocation(program.id, rad_string);
-        free(rad_string);
     }
     
     glProgramUniform3fv(program.id, pos_loc, 1, light.position);
@@ -113,20 +101,18 @@ void SRE_Light_put_unifrorm_array(sre_light light, sre_program program)
 
 void SRE_Light_set_position_uniform(sre_light light, sre_program program)
 {
-    char *pos_string = malloc(64);
+    char pos_string[64];
     int pos_loc;
 
     if (light.position[3] != 0.0f)
     {
         sprintf(pos_string, "lights[%d].position", light.idx);
         pos_loc = glGetUniformLocation(program.id, pos_string);
-        free(pos_string);
     }
     else
     {
         sprintf(pos_string, "inf_lights[%d].position", light.idx);
         pos_loc = glGetUniformLocation(program.id, pos_string);
-        free(pos_string);
     }
     
     
@@ -136,20 +122,18 @@ void SRE_Light_set_position_uniform(sre_light light, sre_program program)
 
 void SRE_Light_set_color_uniform(sre_light light, sre_program program)
 {
-    char *col_string = malloc(64);
+    char col_string[64];
     int col_loc;
 
     if (light.position[3] != 0.0f)
     {
         sprintf(col_string, "lights[%d].color", light.idx);
         col_loc = glGetUniformLocation(program.id, col_string);
-        free(col_string);
     }
     else
     {
         sprintf(col_string, "inf_lights[%d].color", light.idx);
         col_loc = glGetUniformLocation(program.id, col_string);
-        free(col_string);
     }
     
     
@@ -159,7 +143,7 @@ void SRE_Light_set_color_uniform(sre_light light, sre_program program)
 
 void SRE_Light_set_radius_uniform(sre_light light, sre_program program)
 {
-    char *rad_string = malloc(64);
+    char rad_string[64];
 
     if (light.position[3] == 0.0f)
     {
@@ -169,7 +153,6 @@ void SRE_Light_set_radius_uniform(sre_light light, sre_program program)
 
     sprintf(rad_string, "lights[%d].radius", light.idx);
     int rad_loc = glGetUniformLocation(program.id, rad_string);
-    free(rad_string);
 
     glProgramUniform1f(program.id, rad_loc, light.radius);
 }

@@ -57,6 +57,14 @@ typedef struct struct_sre_coldat_aabb
 }
 sre_coldat_aabb;
 
+typedef struct struct_sre_coldat_bsp_tree
+{
+   vec4 deviding_plane;
+   struct struct_sre_coldat_bsp_tree *above;
+   struct struct_sre_coldat_bsp_tree *below;
+}
+sre_coldat_bsp_tree;
+
 extern sre_collider *col_queue[SRE_MAX_NUM_OF_COLS];
 extern uint8_t col_count;
 
@@ -71,6 +79,7 @@ bool SRE_Col_test_capsules(sre_coldat_capsule *col_1, sre_coldat_capsule *col_2)
 bool SRE_Col_test_capsule_sphere(sre_coldat_capsule *capsule, sre_coldat_sphere *sphere);
 bool SRE_Col_test_aabb_sphere(sre_coldat_aabb *aabb, sre_coldat_sphere *sphere);
 bool SRE_Col_test_capsule_aabb(sre_coldat_capsule *capsule, sre_coldat_aabb *aabb);
+bool SRE_Col_test_aabb_bsp_tree(sre_coldat_aabb *aabb, sre_coldat_bsp_tree *bsp_tree);
 
 void SRE_Expand_collision(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col);
 //void expand_sphere_with_sphere(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col);

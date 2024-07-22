@@ -615,6 +615,11 @@ bool SRE_Col_test_capsule_aabb(sre_coldat_capsule *capsule, sre_coldat_aabb *aab
     return dist <= capsule->r;
 }
 
+bool SRE_Col_test_aabb_bsp_tree(sre_coldat_aabb *aabb, sre_coldat_bsp_tree *bsp_tree)
+{
+    return false;
+}
+
 void SRE_Expand_collision(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col)
 {
     // only aabb for now, might add other types of colliders

@@ -3,22 +3,20 @@
 #include <cglm/affine.h>
 #include <cglm/euler.h>
 #include "shaders.h"
-#include "model.h"
+#include "mesh.h"
 #include "collision.h"
 #include "cntl.h"
 
 
 typedef struct struct_sre_prop {
-    gl_mesh *mesh;
+    sre_mesh *mesh;
     sre_collider *collider;
     sre_cntl_handle *cntl;
-
-    mat4 model;
 }
 sre_prop;
 
-void create_prop(gl_mesh *mesh, sre_collider *collider, mat4 *model, sre_prop *out_prop, sre_cntl_handle *cntl);
-void draw_prop(sre_prop prop, sre_program program);
+void create_prop(sre_mesh *mesh, sre_collider *collider, sre_prop *out_prop, sre_cntl_handle *cntl);
+void draw_prop(sre_prop prop, sre_program program, bool draw_collider);
 void translate_prop(sre_prop *prop, vec3 xyz);
 
 void rotate_prop(sre_prop *prop, vec3 axis, float angle);

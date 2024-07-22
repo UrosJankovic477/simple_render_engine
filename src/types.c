@@ -1,7 +1,19 @@
 #include "types.h"
 #include <stdio.h>
 
-sre_norm_16 SRE_Float_to_norm_16(float flp)
+uint8_t SRE_Float_to_unorm_8(float flp)
+{
+    uint8_t fp = 0xffu * flp;
+    return fp;
+}
+
+uint16_t SRE_Float_to_unorm_16(float flp)
+{
+    uint16_t fp = 0xffffu * flp;
+    return fp;
+}
+
+sre_norm_16 SRE_Float_to_fixed_16(float flp)
 {
     unsigned int ftoi = FLOAT_BITS(flp);
     unsigned int sign = ftoi & 0x80000000;

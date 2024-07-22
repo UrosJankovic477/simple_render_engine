@@ -1,16 +1,7 @@
 #include "props.h"
 
-void create_prop(gl_mesh *mesh, sre_collider *collider, mat4 *model, sre_prop *out_prop, sre_cntl_handle *cntl)
-{
-    if (model == NULL)
-    {
-        glm_mat4_identity(out_prop->model);
-    }
-    else
-    {
-        glm_mat4_copy(model, out_prop->model);
-    }
-    
+void create_prop(sre_mesh *mesh, sre_collider *collider, sre_prop *out_prop, sre_cntl_handle *cntl)
+{ 
     out_prop->collider = collider;
     out_prop->cntl = cntl;
     if (cntl && collider)
@@ -21,13 +12,13 @@ void create_prop(gl_mesh *mesh, sre_collider *collider, mat4 *model, sre_prop *o
     out_prop->mesh = mesh;
 }
 
-void draw_prop(sre_prop prop, sre_program program)
+void draw_prop(sre_prop prop, sre_program program, bool draw_collider)
 {
     if (prop.mesh)
     {
-        SRE_Draw_gl_mesh(prop.mesh, program, prop.model);
+        SRE_Mesh_draw(prop.mesh, program);
     }
-    if (prop.collider)
+    if (prop.collider && draw_collider)
     {
         SRE_Draw_collider(prop.collider, program);
     }
@@ -36,7 +27,7 @@ void draw_prop(sre_prop prop, sre_program program)
 
 void translate_prop(sre_prop *prop, vec3 xyz)
 {
-    glm_translate(prop->model, xyz);
+    glm_translate(prop->mesh->model_mat, xyz);
     if (prop->cntl)
     {
         glm_vec3_add(prop->cntl->orig, xyz, prop->cntl->orig);
@@ -49,22 +40,22 @@ void translate_prop(sre_prop *prop, vec3 xyz)
 
 void rotate_prop(sre_prop *prop, vec3 axis, float angle)
 {
-    glm_rotate(prop->model, angle, axis);
+    glm_rotate(prop->mesh->model_mat, angle, axis);
 }
 
 void rotate_prop_x(sre_prop *prop, float angle)
 {
-    glm_rotate_x(prop->mesh, angle, prop->mesh);
+    glm_rotate_x(prop->mesh->model_mat, angle, prop->mesh->model_mat);
 }
 
 void rotate_prop_y(sre_prop *prop, float angle)
 {
-    glm_rotate_y(prop->mesh, angle, prop->mesh);
+    glm_rotate_y(prop->mesh->model_mat, angle, prop->mesh->model_mat);
 }
 
 void rotate_prop_z(sre_prop *prop, float angle)
 {
-    glm_rotate_z(prop->mesh, angle, prop->mesh);
+    glm_rotate_z(prop->mesh->model_mat, angle, prop->mesh->model_mat);
 }
 
 void rotate_euler_prop(sre_prop *prop, vec3 euler_rot)
@@ -72,12 +63,12 @@ void rotate_euler_prop(sre_prop *prop, vec3 euler_rot)
     mat4 trans;
     glm_mat4_identity(trans);
     glm_euler(euler_rot, trans);
-    glm_mat4_mul(prop->model, trans, prop->model);
+    glm_mat4_mul(prop->mesh->model_mat, trans, prop->mesh->model_mat);
 }
 
 void scale_prop(sre_prop *prop, vec3 xyz)
 {
-    glm_scale(prop->model, xyz);
+    glm_scale(prop->mesh->model_mat, xyz);
 }
 
 void prop_control(sre_prop *prop, float dt, float dx, float dy)
@@ -125,5 +116,5 @@ void prop_control(sre_prop *prop, float dt, float dx, float dy)
     glm_vec3_copy(new_end, prop->cntl->orig);
     glm_vec3_sub(new_end, old_orig, trans);
     SRE_Col_translate(prop->collider, trans);
-    glm_translate(prop->model, trans);
+    glm_translate(prop->mesh->model_mat, trans);
 }

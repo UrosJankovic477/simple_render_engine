@@ -6,15 +6,15 @@
 #include "glad/glad.h"
 #include "SDL2/SDL.h"
 #include "light.h"
-#include "model.h"
 #include "props.h"
 #include "postproc.h"
 #include "shaders.h"
 #include "texture.h"
 #include "terrain_generation.h"
 #include "types.h"
+#include "asset_import.h"
 
-void SRE_Init(uint16_t width, uint16_t height, bool debug_on);
+void SRE_Init(int *argc, char **argv[], sre_importer *importer);
 void main_loop();
 void on_cntl();
 

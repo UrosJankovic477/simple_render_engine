@@ -30,12 +30,12 @@ extern GLuint postproc_frag_shdr;
 extern GLint postproc_uniform_tex_id;
 extern GLint postproc_uniform_time;
 
-void init_postproc();
-void delete_postproc_plane();
-int framebuffer_init(sre_framebuffer *framebuffer, GLsizei width, GLsizei height, GLenum fmt);
-void framebuffer_bind(sre_framebuffer framebuffer, GLuint program);
-void draw_to_main_framebuffer(sre_framebuffer framebuffer, GLuint postproc_prog, GLsizei width, GLsizei height);
-void delete_framebuffer(sre_framebuffer *framebuffer);
+void SRE_Init_postproc();
+void SRE_Delete_postproc_plane();
+int SRE_Framebuffer_init(sre_framebuffer *framebuffer, GLsizei width, GLsizei height, GLenum fmt);
+void SRE_Framebuffer_bind(sre_framebuffer framebuffer, GLuint program);
+void SRE_Draw_to_main_framebuffer(sre_framebuffer framebuffer, GLuint postproc_prog, GLsizei width, GLsizei height);
+void SRE_Delete_framebuffer(sre_framebuffer *framebuffer);
 
 
 #endif

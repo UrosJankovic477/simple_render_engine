@@ -17,7 +17,7 @@ GLuint postproc_frag_shdr = 0;
 GLint postproc_uniform_tex_id = 0;
 GLint postproc_uniform_time = 0;
 
-void init_postproc()
+void SRE_Init_postproc()
 {
     glGenVertexArrays(1, &postproc_plane_vao);
     glBindVertexArray(postproc_plane_vao);
@@ -70,13 +70,13 @@ void init_postproc()
 
 }
 
-void delete_postproc_plane()
+void SRE_Delete_postproc_plane()
 {
     glDeleteBuffers(1, &postproc_plane_vbo);
     glDeleteVertexArrays(1, &postproc_plane_vao);
 }
 
-int framebuffer_init(sre_framebuffer *framebuffer, GLsizei width, GLsizei height, GLenum fmt)
+int SRE_Framebuffer_init(sre_framebuffer *framebuffer, GLsizei width, GLsizei height, GLenum fmt)
 {
     framebuffer->width = width;
     framebuffer->height = height;
@@ -113,7 +113,7 @@ int framebuffer_init(sre_framebuffer *framebuffer, GLsizei width, GLsizei height
     return EXIT_SUCCESS;
 }
 
-void framebuffer_bind(sre_framebuffer framebuffer, GLuint program)
+void SRE_Framebuffer_bind(sre_framebuffer framebuffer, GLuint program)
 {
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, framebuffer.width, framebuffer.height);
@@ -123,7 +123,7 @@ void framebuffer_bind(sre_framebuffer framebuffer, GLuint program)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void draw_to_main_framebuffer(sre_framebuffer framebuffer, GLuint postproc_prog, GLsizei width, GLsizei height)
+void SRE_Draw_to_main_framebuffer(sre_framebuffer framebuffer, GLuint postproc_prog, GLsizei width, GLsizei height)
 {
     glDisable(GL_DEPTH_TEST);
     glViewport(0, 0, width, height);
@@ -144,7 +144,7 @@ void draw_to_main_framebuffer(sre_framebuffer framebuffer, GLuint postproc_prog,
     glDisableVertexAttribArray(1);
 }
 
-void delete_framebuffer(sre_framebuffer *framebuffer)
+void SRE_Delete_framebuffer(sre_framebuffer *framebuffer)
 {
     glDeleteTextures(2, framebuffer->textures);
     glDeleteFramebuffers(1, &(framebuffer->id));

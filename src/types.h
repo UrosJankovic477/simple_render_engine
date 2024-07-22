@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <cglm/types.h>
 #define FLOAT_BITS(x) *((unsigned int*)((void*)&(x)))
 #define THREE10S_X(x) ((x) & 0x0000003f)
 #define THREE10S_Y(x) (((x) >> 10) & 0x0000003f)
@@ -45,6 +46,14 @@ typedef struct sre_vtx_float_short_2_10_10_10_struct
     sre_norm_16 u;
     sre_norm_16 v;
     sre_2_10_10_10s normal;
+    uint32_t bone1;
+    uint32_t bone2;
+    uint32_t bone3;
+    uint32_t bone4;
+    float w1;
+    float w2;
+    float w3;
+    float w4;
 }
 sre_vertex, sre_vtx_float_short_2_10_10_10;
 
@@ -70,7 +79,9 @@ sre_float_vec3;
 #ifdef __cplusplus
 extern "C" {
 #endif
-uint16_t SRE_Float_to_norm_16(float flp);
+uint8_t SRE_Float_to_unorm_8(float flp);
+uint16_t SRE_Float_to_unorm_16(float flp);
+uint16_t SRE_Float_to_fixed_16(float flp);
 uint16_t SRE_Cstrng_to_fixed(const char *cstr);
 sre_2_10_10_10s SRE_Float_to_2_10_10_10(float flp_x, float flp_y, float flp_z);
 sre_2_10_10_10s SRE_Float_to_2_10_10_10s(float flp_x, float flp_y, float flp_z);

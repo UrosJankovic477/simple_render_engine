@@ -4,6 +4,7 @@
 #include <stb/stb_image.h>
 #include "image.h"
 #include "types.h"
+#include "errors.h"
 
 typedef struct struct_sre_texture
 {
@@ -20,9 +21,9 @@ sre_texture;
 extern "C" {
 #endif
 
-void SRE_Load_texture(const char *path, sre_texture *texture_out);
+int SRE_Load_texture(const char *path, sre_texture *texture_out);
 
-void SRE_Delete_texture(sre_texture texture);
+int SRE_Delete_texture(sre_texture texture);
 
 #ifdef __cplusplus
 }

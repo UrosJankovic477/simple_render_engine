@@ -2,19 +2,23 @@
 #define SRE_MEM_ALLOCATION
 
 #include <stdlib.h>
+#include <stdint.h>
+#include "errors.h"
 
 typedef struct struct_sre_mempool
 {
     char *data;
-    unsigned long long index;
-    unsigned long long size;
+    uint64_t index;
+    size_t size;
+    struct struct_sre_mempool *parent;
 } sre_mempool;
 
+extern sre_mempool main_mempool;
+extern sre_mempool aux_mempool; // auxilary
 
-extern sre_mempool dflt_mempool;
-
-int SRE_Init_mempool(sre_mempool *mempool, size_t size);
-int SRE_Get_mem_from_mempool(sre_mempool mempool, void **dest, size_t size);
-int SRE_Finalize_mempool(sre_mempool mempool_ptr);
+int SRE_Mempool_reset(sre_mempool *mempool_ptr);
+int SRE_Mempool_alloc(sre_mempool *mempool_ptr, void **dest, size_t size);
+int SRE_Mempool_create(sre_mempool *parent_pool_ptr, sre_mempool *mempool_ptr, size_t size);
+int SRE_Mempool_destroy(sre_mempool *mempool_ptr);
 
 #endif

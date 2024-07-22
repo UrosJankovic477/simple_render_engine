@@ -1,6 +1,7 @@
 #include "common.h"
 
-void SRE_Init(uint16_t width, uint16_t height, bool debug_on)
+/*
+void SRE_Init(uint16_t width, uint16_t height, bool debug_on, sre_importer *importer)
 {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_GL_LoadLibrary(NULL);
@@ -183,3 +184,5 @@ void SRE_Init(uint16_t width, uint16_t height, bool debug_on)
     glEnable(GL_DEPTH_TEST);
 
 }
+
+*/

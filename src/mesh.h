@@ -3,16 +3,24 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <glad/glad.h>
+#include <cglm/vec4.h>
+#include <cglm/ivec4.h>
+#include "material.h"
+#include "armature.h"
 #include "types.h"
-#ifndef SRE_MATERIAL_HANDLE_T
-#define SRE_MATERIAL_HANDLE_T uint64_t
-#endif
-#ifndef SRE_ARMATURE_HANDLE_T
-#define SRE_ARMATURE_HANDLE_T uint64_t
-#endif
+#include "mem_allocation.h"
+#include "importer.h"
+#include "hashmap.h"
+#include "shaders.h"
 
-typedef struct struct_sre_mesh_data
+#define MAX_VERTEX_COUNT 0xffff
+
+typedef struct struct_sre_mesh
 {
+    mat4 model_mat;
+    GLuint vao;
+    GLuint vbo;
     uint64_t vertex_count;
     sre_float_vec3 *vertex_positions;
     sre_2_10_10_10s *vertex_normals;
@@ -21,17 +29,17 @@ typedef struct struct_sre_mesh_data
     sre_norm_16_vec2 *uv_coordinates;
     sre_2_10_10_10s *polygon_normals;
     sre_rgba *vertex_colors;
-    SRE_MATERIAL_HANDLE_T material_handle;
-    SRE_ARMATURE_HANDLE_T armature_handle;
-} sre_mesh_data;
+    vec4 *weights;
+    ivec4 *bones;
+    sre_material *material;
+    sre_armature *armature;
+    char *material_name;
+    char *armature_name;
+} sre_mesh;
 
-typedef struct struct_sre_vertex_groups_data
-{
-    uint8_t group_count;
-    uint8_t *groups;
-    float *values;
-} sre_vertex_groups_data;
-
-int SRE_Mesh_import(const char *filepath, sre_mesh_data *mesh_data);
+int SRE_Mesh_process(sre_importer *importer, sre_mempool *asset_mempool, FILE *file, fpos_t *position, sre_mesh *mesh);
+int SRE_Mesh_load(sre_mesh *mesh);
+int SRE_Mesh_unload(sre_mesh *mesh);
+int SRE_Mesh_draw(sre_mesh *mesh, sre_program program);
 
 #endif
