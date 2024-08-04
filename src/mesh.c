@@ -49,9 +49,9 @@ int SRE_Mesh_process(sre_importer *importer, sre_mempool *asset_mempool, FILE *f
             }
             case SRE_VCO:
             {
-                mesh->vertex_positions[vco_idx].x = atof(strtok(NULL, blank_chars));
-                mesh->vertex_positions[vco_idx].y = atof(strtok(NULL, blank_chars));
-                mesh->vertex_positions[vco_idx].z = atof(strtok(NULL, blank_chars));
+                mesh->vertex_positions[vco_idx][0] = atof(strtok(NULL, blank_chars));
+                mesh->vertex_positions[vco_idx][1] = atof(strtok(NULL, blank_chars));
+                mesh->vertex_positions[vco_idx][2] = atof(strtok(NULL, blank_chars));
                 vco_idx++;
                 break;
             }
@@ -132,9 +132,9 @@ int SRE_Mesh_load(sre_mesh *mesh)
     for (size_t i = 0; i < mesh->index_count; i++)
     {
         uint64_t vertex_idx = mesh->vertex_indices[i];
-        vertices[i].posx = mesh->vertex_positions[vertex_idx].x;
-        vertices[i].posy = mesh->vertex_positions[vertex_idx].y;
-        vertices[i].posz = mesh->vertex_positions[vertex_idx].z;
+        vertices[i].posx = mesh->vertex_positions[vertex_idx][0];
+        vertices[i].posy = mesh->vertex_positions[vertex_idx][1];
+        vertices[i].posz = mesh->vertex_positions[vertex_idx][2];
         vertices[i].normal = mesh->vertex_normals[vertex_idx];
         vertices[i].u = mesh->uv_coordinates[i].x;
         vertices[i].v = mesh->uv_coordinates[i].y;

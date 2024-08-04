@@ -113,6 +113,7 @@ int main(int argc, char **argv)
 
     SRE_Import_asset(&importer, "../resources/models/checkerboard.smtl", true);
     SRE_Import_asset(&importer, "../resources/models/checkerboard.smsh", true);
+    SRE_Import_collision(&importer, "../resources/models/checkerboard.scol", true);
     
     SRE_Cam_set_view_mat(&cam);
     SRE_Cam_set_proj_mat(&cam);
@@ -180,16 +181,29 @@ int main(int argc, char **argv)
     //sre_terrain terrain;
     //generate_terrain_vertices(100, 100, &terrain, 10);
 
-    sre_object squishy, room;
+    sre_object squishy, room, collision;
     SRE_Importer_get_object(&importer, "Cube", &squishy);
     SRE_Importer_get_object(&importer, "checkerboard_room", &room);
+    SRE_Importer_get_object(&importer, "collision", &collision);
+
+    sre_cntl_handle cntl;
+
+    SRE_Create_cntl(&cntl, 0, 0, 2, 1, (vec3){0, 0, 0}, (vec3){0, 1, 0});
+
     sre_mesh *squishy_mesh = squishy.object;
     SRE_Mesh_load(squishy_mesh);
     sre_mesh *room_mesh = room.object;
     SRE_Mesh_load(room_mesh);
+    sre_prop room_prop, squishy_prop;
+    SRE_Prop_create(room_mesh, collision.object, &room_prop, NULL);
+    SRE_Prop_create(squishy_mesh, NULL, &squishy_prop, &cntl);
+    SRE_Prop_gen_aabb(&squishy_prop, &importer.always_loaded_assets);
+    SRE_Prop_translate(&squishy_prop, (vec3){0, 1.0, 0});
     sre_action wiggle;
     SRE_Action_get_by_name(squishy_mesh->armature, "wiggle", &wiggle);
     SRE_Action_set_active(&wiggle);
+    SRE_Col_load(squishy_prop.collider);
+    SRE_Col_load(room_prop.collider);
     Uint64 now = SDL_GetPerformanceCounter();
     while (running)
     {
@@ -218,6 +232,14 @@ int main(int argc, char **argv)
                                     CTL_DIR_DOWN * keystates[SDL_SCANCODE_LSHIFT] |
                                     CTL_DIR_LEFT * keystates[SDL_SCANCODE_A] |
                                     CTL_DIR_RIGHT * keystates[SDL_SCANCODE_D];
+
+                squishy_prop.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_DOWN] |
+                                    CTL_DIR_BACK * keystates[SDL_SCANCODE_UP] |
+                                    CTL_DIR_UP * keystates[SDL_SCANCODE_0] |
+                                    CTL_DIR_DOWN * keystates[SDL_SCANCODE_1] |
+                                    CTL_DIR_LEFT * keystates[SDL_SCANCODE_LEFT] |
+                                    CTL_DIR_RIGHT * keystates[SDL_SCANCODE_RIGHT];
+
                 if (keystates[SDL_SCANCODE_ESCAPE])
                 {
                     running = 0;
@@ -242,6 +264,14 @@ int main(int argc, char **argv)
                                     CTL_DIR_DOWN * keystates[SDL_SCANCODE_LSHIFT] |
                                     CTL_DIR_LEFT * keystates[SDL_SCANCODE_A] |
                                     CTL_DIR_RIGHT * keystates[SDL_SCANCODE_D];
+                
+                squishy_prop.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_DOWN] |
+                                    CTL_DIR_BACK * keystates[SDL_SCANCODE_UP] |
+                                    CTL_DIR_UP * keystates[SDL_SCANCODE_0] |
+                                    CTL_DIR_DOWN * keystates[SDL_SCANCODE_1] |
+                                    CTL_DIR_LEFT * keystates[SDL_SCANCODE_LEFT] |
+                                    CTL_DIR_RIGHT * keystates[SDL_SCANCODE_RIGHT];
+
                 break;
             }
             default:
@@ -262,6 +292,11 @@ int main(int argc, char **argv)
             //glProgramUniformMatrix4fv(program_alpha_clip.id, SRE_Get_uniform_location(&program_alpha_clip, "proj"), 1, GL_FALSE, cam.proj);
             //glProgramUniformMatrix4fv(program_alpha_clip.id, SRE_Get_uniform_location(&program_alpha_clip, "view"), 1, GL_FALSE, cam.view);       
         }
+        if (squishy_prop.cntl->flags)
+        {
+            SRE_Prop_control(&squishy_prop, dt, xrel, yrel);
+        }
+        
         glUseProgram(program.id);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // draw to postprocess framebuffer
@@ -269,7 +304,7 @@ int main(int argc, char **argv)
         glUniform1ui(SRE_Get_uniform_location(&program, "time"), now);
         SRE_Set_current_keyframes(program, now);
         // Draw here
-        SRE_Mesh_draw(room_mesh, program);
+        SRE_Prop_draw(room_prop, program, false);
         SRE_Mesh_draw(squishy_mesh, program);
 
         SRE_Draw_to_main_framebuffer(postproc_framebuffer, postproc_program, width, height);

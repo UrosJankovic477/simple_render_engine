@@ -4,7 +4,9 @@
 #include "mesh.h"
 #include "armature.h"
 #include "material.h"
+#include "collision.h"
 
 int SRE_Import_asset(sre_importer *importer, const char *filepath, bool always_loaded);
+int SRE_Import_collision(sre_importer *importer, const char *filepath, bool always_loaded);
 
 #endif

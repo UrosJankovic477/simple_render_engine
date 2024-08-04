@@ -135,7 +135,6 @@ int SRE_Set_current_keyframes(sre_program program, uint32_t time)
         t_normalized = 0.0f;
     }
     
-    printf("%f\n", t_normalized);
     glUniform1f(SRE_Get_uniform_location(&program, "t_normalized"), t_normalized);
     glUniformMatrix4fv(SRE_Get_uniform_location(&program, "bone_matrices_kf1"), active_action->bone_count, GL_FALSE, &active_action->keyframes[kf1_idx].bone_matrices[0][0][0]);
     glUniformMatrix4fv(SRE_Get_uniform_location(&program, "bone_matrices_kf2"), active_action->bone_count, GL_FALSE, &active_action->keyframes[kf2_idx].bone_matrices[0][0][0]);

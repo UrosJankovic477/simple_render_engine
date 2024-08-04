@@ -3,10 +3,16 @@
 sre_collider *col_queue[SRE_MAX_NUM_OF_COLS] = {0};
 uint8_t col_count = 0;
 
+enum 
+{
+    BSP_EMPTY = 0xffff,
+    BSP_SOLID = 0xfffe,
+};
+
 int SRE_Create_collider(sre_collider *col, void *data, sre_collider_type type)
 {
     if (col == NULL || data == NULL ||
-        (type & (COL_AABB | COL_CAPSULE | COL_RECT | COL_SPHERE) == 0))
+        (type & (COL_AABB | COL_BSP_TREE) == 0))
     {
         return EXIT_FAILURE;
     }
@@ -20,24 +26,8 @@ bool SRE_Col_test(sre_collider *col_1, sre_collider *col_2)
 {
     switch (col_1->type | (col_2->type << 1))
     {
-    case COL_SPHERE | (COL_SPHERE << 1):
-        return SRE_Col_test_spheres(col_1->data, col_2->data);
-    case COL_SPHERE | (COL_CAPSULE << 1):
-        return SRE_Col_test_capsule_sphere(col_2->data, col_1->data);
-    case COL_SPHERE | (COL_AABB << 1):
-        return SRE_Col_test_aabb_sphere(col_2->data, col_1->data);
-    case COL_CAPSULE | (COL_SPHERE << 1):
-        return SRE_Col_test_capsule_sphere(col_1->data, col_2->data);
-    case COL_CAPSULE | (COL_CAPSULE << 1):
-        return SRE_Col_test_capsules(col_1->data, col_2->data);
-    case COL_CAPSULE | (COL_AABB << 1):
-        return SRE_Col_test_capsule_aabb(col_1->data, col_2->data);
-    case COL_AABB | (COL_SPHERE << 1):
-        return SRE_Col_test_aabb_sphere(col_1->data, col_2->data);
     case COL_AABB | (COL_AABB << 1):
         return SRE_Col_test_aabbs(col_1->data, col_2->data);
-    case COL_AABB | (COL_CAPSULE << 1):
-        return SRE_Col_test_capsule_aabb(col_2->data, col_1->data);
     default:
         break;
     }
@@ -53,15 +43,6 @@ int SRE_Copy_collider(sre_collider *src, sre_collider *dest)
     case COL_AABB:
         count = sizeof(sre_coldat_aabb);
         break;
-    case COL_CAPSULE:
-        count = sizeof(sre_coldat_capsule);
-        break;
-    case COL_RECT:
-        count = sizeof(sre_coldat_rect);
-        break;
-    case COL_SPHERE:
-        count = sizeof(sre_coldat_sphere);
-        break;
     default:
         return EXIT_FAILURE;
     }
@@ -70,48 +51,97 @@ int SRE_Copy_collider(sre_collider *src, sre_collider *dest)
     return EXIT_SUCCESS;
 }
 
-bool SRE_Col_test_aabb_sphere(sre_coldat_aabb *aabb, sre_coldat_sphere *sphere)
+bool SRE_Line_intersection_bsp_tree(vec3 start, sre_collision_context *context) 
 {
-    float x = fmax(aabb->min_pt[0], fmin(aabb->max_pt[0], sphere->center[0]));
-    float y = fmax(aabb->min_pt[1], fmin(aabb->max_pt[1], sphere->center[1]));
-    float z = fmax(aabb->min_pt[2], fmin(aabb->max_pt[2], sphere->center[2]));
-    float dist = glm_vec3_distance((vec3){x, y, z}, sphere->center);
-    return dist <= sphere->r;
+    uint16_t index = context->bsp_tree_index;
+    if (index == BSP_EMPTY)
+    {
+        printf("empty region\n");
+        return false;
+    }
+
+    if (index == BSP_SOLID)
+    {
+        printf("solid region\n");
+        glm_vec3_copy(start, context->intersection);
+        return true;
+    }
+    sre_coldat_bsp_tree *root = (sre_coldat_bsp_tree *)context->coldat;
+    sre_coldat_bsp_tree node = root[index];
+    vec3 normal; 
+    glm_vec3_copy(node.deviding_plane, normal);
+    float d = node.deviding_plane[3];
+    vec3 dx;
+    glm_vec3_sub(context->end, start, dx);
+    float t1 = glm_dot(start, normal);
+    float t2 = glm_dot(dx, normal);
+
+    uint8_t side = t1 <= d;
+
+    bool intersects = false;
+    if (t2 != 0.0f)
+    {
+        float t = (d - t1) / t2;
+        if (t >= 0.0f && t <= 1.0f)
+        {
+            intersects = true;
+            glm_vec3_copy(start, context->intersection);
+        }
+    }
+    glm_vec3_copy(normal, context->normal);
+    context->bsp_tree_parent = index;
+    if (intersects)
+    {
+        vec3 mid;
+        glm_vec3_copy(context->intersection, mid);
+        context->bsp_tree_index = node.children[1 - side];
+        bool result = SRE_Line_intersection_bsp_tree(mid, context);
+        if (result)
+        {
+            return result;
+        }
+        glm_vec3_copy(context->end, mid);
+        context->bsp_tree_index = node.children[side];
+        return SRE_Line_intersection_bsp_tree(start, context);
+    }
+    context->bsp_tree_index = node.children[side];
+    return SRE_Line_intersection_bsp_tree(start, context); 
 }
 
-bool SRE_Line_intersection(vec3 start, vec3 end, sre_collider *col, vec3 intersection)
+bool SRE_Line_intersection_aabb(vec3 start, sre_collision_context *context)
 {
     uint8_t start_flags, end_flags, intersection_flags;
-    sre_coldat_aabb *data = col->data;
+    sre_coldat_aabb *data = (sre_coldat_aabb *)context->coldat;
     start_flags = (start[0] <= data->min_pt[0]) 
     | ((start[0] >= data->max_pt[0]) << 1)
     | ((start[1] <= data->min_pt[1]) << 2)
     | ((start[1] >= data->max_pt[1]) << 3)
     | ((start[2] <= data->min_pt[2]) << 4)
     | ((start[2] >= data->max_pt[2]) << 5);
-    end_flags = (end[0] <= data->min_pt[0]) 
-    | ((end[0] >= data->max_pt[0]) << 1)
-    | ((end[1] <= data->min_pt[1]) << 2)
-    | ((end[1] >= data->max_pt[1]) << 3)
-    | ((end[2] <= data->min_pt[2]) << 4)
-    | ((end[2] >= data->max_pt[2]) << 5);
+    end_flags = (context->end[0] <= data->min_pt[0]) 
+    | ((context->end[0] >= data->max_pt[0]) << 1)
+    | ((context->end[1] <= data->min_pt[1]) << 2)
+    | ((context->end[1] >= data->max_pt[1]) << 3)
+    | ((context->end[2] <= data->min_pt[2]) << 4)
+    | ((context->end[2] >= data->max_pt[2]) << 5);
+
+    vec3 normals[6] = {
+        {1.0f, 0.0f, 0.0f},
+        {-1.0f, 0.0f, 0.0f},
+        {0.0f, 1.0f, 0.0f},
+        {0.0f, -1.0f, 0.0f},
+        {0.0f, 0.0f, 1.0f},
+        {0.0f, 0.0f, -1.0f},
+    };
 
     if (!(start_flags | end_flags) || !start_flags)
     {
         // line fully or partially inside collider
         vec3 dv;
-        glm_vec3_sub(start, end, dv);
+        glm_vec3_sub(start, context->end, dv);
         float t[6];
         float proj[6];
         vec3 start_to_corner[2];
-        vec3 normals[6] = {
-            {1.0f, 0.0f, 0.0f},
-            {-1.0f, 0.0f, 0.0f},
-            {0.0f, 1.0f, 0.0f},
-            {0.0f, -1.0f, 0.0f},
-            {0.0f, 0.0f, 1.0f},
-            {0.0f, 0.0f, -1.0f},
-        };
 
         glm_vec3_sub(start, data->min_pt, start_to_corner[0]);
         glm_vec3_sub(start, data->max_pt, start_to_corner[1]);
@@ -132,19 +162,19 @@ bool SRE_Line_intersection(vec3 start, vec3 end, sre_collider *col, vec3 interse
         }
         vec3 dvt;
         glm_vec3_scale(dv, closest, dvt);
-        glm_vec3_add(start, dvt, intersection);
+        glm_vec3_add(start, dvt, context->intersection);
         if (proj[j] > 0 && end_flags)
         {
             return false;
         }
         vec3 penetration, backtrack;
-        glm_vec3_sub(end, intersection, penetration);
+        glm_vec3_sub(context->end, context->intersection, penetration);
         glm_vec3_scale(normals[j], proj[j], backtrack);
 
-        glm_vec3_sub(end, proj, end);
+        glm_vec3_sub(context->end, proj, context->end);
         for (size_t i = 0; i < 3; i++)
         {
-            end[i] = glm_clamp(end[i], data->min_pt[i] - 0.01f, data->max_pt[i] + 0.01f);
+            context->end[i] = glm_clamp(context->end[i], data->min_pt[i] - 0.01f, data->max_pt[i] + 0.01f);
         }
         return true;
     }
@@ -159,11 +189,11 @@ bool SRE_Line_intersection(vec3 start, vec3 end, sre_collider *col, vec3 interse
     // dv  = x1 - x0
 
     vec3 dv;
-    glm_vec3_sub(start, end, dv);
+    glm_vec3_sub(start, context->end, dv);
 
     float t = 0.0f;
 
-    glm_vec3_copy(start, intersection);
+    glm_vec3_copy(start, context->intersection);
     intersection_flags = start_flags;
     uint8_t hit_dir = -1;
     if (intersection_flags & 0x1)
@@ -171,13 +201,13 @@ bool SRE_Line_intersection(vec3 start, vec3 end, sre_collider *col, vec3 interse
         // right
         float xmin = data->min_pt[0];
         t = (xmin - start[0]) / dv[0];
-        intersection[0] = xmin - 0.01;
-        intersection[1] += dv[1] * t;
-        intersection[2] += dv[2] * t;
-        intersection_flags = ((intersection[1] < data->min_pt[1]) << 2)
-        | ((intersection[1] > data->max_pt[1]) << 3)
-        | ((intersection[2] < data->min_pt[2]) << 4)
-        | ((intersection[2] > data->max_pt[2]) << 5);
+        context->intersection[0] = xmin - 0.01;
+        context->intersection[1] += dv[1] * t;
+        context->intersection[2] += dv[2] * t;
+        intersection_flags = ((context->intersection[1] < data->min_pt[1]) << 2)
+        | ((context->intersection[1] > data->max_pt[1]) << 3)
+        | ((context->intersection[2] < data->min_pt[2]) << 4)
+        | ((context->intersection[2] > data->max_pt[2]) << 5);
         hit_dir = 0;
     }
     else if (intersection_flags & 0x2)
@@ -185,117 +215,98 @@ bool SRE_Line_intersection(vec3 start, vec3 end, sre_collider *col, vec3 interse
         // left
         float xmax = data->max_pt[0];
         t = (start[0] - xmax) / dv[0];
-        intersection[0] = xmax + 0.01;
-        intersection[1] += dv[1] * t;
-        intersection[2] += dv[2] * t;
-        intersection_flags = ((intersection[1] < data->min_pt[1]) << 2)
-        | ((intersection[1] > data->max_pt[1]) << 3)
-        | ((intersection[2] < data->min_pt[2]) << 4)
-        | ((intersection[2] > data->max_pt[2]) << 5);
+        context->intersection[0] = xmax + 0.01;
+        context->intersection[1] += dv[1] * t;
+        context->intersection[2] += dv[2] * t;
+        intersection_flags = ((context->intersection[1] < data->min_pt[1]) << 2)
+        | ((context->intersection[1] > data->max_pt[1]) << 3)
+        | ((context->intersection[2] < data->min_pt[2]) << 4)
+        | ((context->intersection[2] > data->max_pt[2]) << 5);
         hit_dir = 1;
     }
     if (intersection_flags & 0x4)
     {
         // up
         float ymin = data->min_pt[1];
-        t = (ymin - intersection[1]) / dv[1];
-        intersection[0] += dv[0] * t;
-        intersection[1] = ymin - 0.01;
-        intersection[2] += dv[2] * t;
-        intersection_flags = ((intersection[0] < data->min_pt[0]))
-        | ((intersection[0] > data->max_pt[0]) << 1)
-        | ((intersection[2] < data->min_pt[2]) << 4)
-        | ((intersection[2] > data->max_pt[2]) << 5);
+        t = (ymin - context->intersection[1]) / dv[1];
+        context->intersection[0] += dv[0] * t;
+        context->intersection[1] = ymin - 0.01;
+        context->intersection[2] += dv[2] * t;
+        intersection_flags = ((context->intersection[0] < data->min_pt[0]))
+        | ((context->intersection[0] > data->max_pt[0]) << 1)
+        | ((context->intersection[2] < data->min_pt[2]) << 4)
+        | ((context->intersection[2] > data->max_pt[2]) << 5);
         hit_dir = 2;
     }
     else if (intersection_flags & 0x8)
     {
         // down
         float ymax = data->max_pt[1];
-        t = (intersection[1] - ymax) / dv[1];
-        intersection[0] += dv[0] * t;
-        intersection[1] = ymax + 0.01;
-        intersection[2] += dv[2] * t;
-        intersection_flags = ((intersection[0] <= data->min_pt[0]))
-        | ((intersection[0] >= data->max_pt[0]) << 1)
-        | ((intersection[2] <= data->min_pt[2]) << 4)
-        | ((intersection[2] >= data->max_pt[2]) << 5);
+        t = (context->intersection[1] - ymax) / dv[1];
+        context->intersection[0] += dv[0] * t;
+        context->intersection[1] = ymax + 0.01;
+        context->intersection[2] += dv[2] * t;
+        intersection_flags = ((context->intersection[0] <= data->min_pt[0]))
+        | ((context->intersection[0] >= data->max_pt[0]) << 1)
+        | ((context->intersection[2] <= data->min_pt[2]) << 4)
+        | ((context->intersection[2] >= data->max_pt[2]) << 5);
         hit_dir = 3;
     }
     if (intersection_flags & 0x10)
     {
         // front
         float zmin = data->min_pt[2];
-        t = (zmin - intersection[2]) / dv[2];
-        intersection[0] += dv[0] * t;
-        intersection[1] += dv[1] * t;
-        intersection[2] = zmin - 0.01;
-        intersection_flags = ((intersection[0] <= data->min_pt[0]))
-        | ((intersection[0] >= data->max_pt[0]) << 1)
-        | ((intersection[1] <= data->min_pt[1]) << 2)
-        | ((intersection[1] >= data->max_pt[1]) << 3);
+        t = (zmin - context->intersection[2]) / dv[2];
+        context->intersection[0] += dv[0] * t;
+        context->intersection[1] += dv[1] * t;
+        context->intersection[2] = zmin - 0.01;
+        intersection_flags = ((context->intersection[0] <= data->min_pt[0]))
+        | ((context->intersection[0] >= data->max_pt[0]) << 1)
+        | ((context->intersection[1] <= data->min_pt[1]) << 2)
+        | ((context->intersection[1] >= data->max_pt[1]) << 3);
         hit_dir = 4;
     }
     else if (intersection_flags & 0x20)
     {
         // back
         float zmax = data->max_pt[2];
-        t = (intersection[2] - zmax) / dv[2];
-        intersection[0] += dv[0] * t;
-        intersection[1] += dv[1] * t;
-        intersection[2] = zmax + 0.01;
-        intersection_flags = ((intersection[0] <= data->min_pt[0]))
-        | ((intersection[0] >= data->max_pt[0]) << 1)
-        | ((intersection[1] <= data->min_pt[1]) << 2)
-        | ((intersection[1] >= data->max_pt[1]) << 3);
+        t = (context->intersection[2] - zmax) / dv[2];
+        context->intersection[0] += dv[0] * t;
+        context->intersection[1] += dv[1] * t;
+        context->intersection[2] = zmax + 0.01;
+        intersection_flags = ((context->intersection[0] <= data->min_pt[0]))
+        | ((context->intersection[0] >= data->max_pt[0]) << 1)
+        | ((context->intersection[1] <= data->min_pt[1]) << 2)
+        | ((context->intersection[1] >= data->max_pt[1]) << 3);
         hit_dir = 5;
     }
 
-    vec3 penetration, normal, proj;
-    glm_vec3_sub(end, intersection, penetration);
-    switch (hit_dir)
-    {
-    case 0:
-        normal[0] = 1;
-        normal[1] = 0;
-        normal[2] = 0;
-        break;
-    case 1:
-        normal[0] = -1;
-        normal[1] = 0;
-        normal[2] = 0;
-        break;
-    case 2:
-        normal[0] = 0;
-        normal[1] = 1;
-        normal[2] = 0;
-        break;
-    case 3:
-        normal[0] = 0;
-        normal[1] = -1;
-        normal[2] = 0;
-        break;
-    case 4:
-        normal[0] = 0;
-        normal[1] = 0;
-        normal[2] = 1;
-        break;
-    case 5:
-        normal[0] = 0;
-        normal[1] = 0;
-        normal[2] = -1;
-        break;
-    default:
-        break;
-    }
-    float proj_mag = glm_vec3_dot(penetration, normal);
-    glm_vec3_scale(normal, proj_mag, proj);
-    glm_vec3_sub(end, proj, end);
-    for (size_t i = 0; i < 3; i++)
-    {
-        end[i] = glm_clamp(end[i], data->min_pt[i] - 0.01f, data->max_pt[i] + 0.01f);
-    }
+    glm_vec3_copy(normals[hit_dir], context->normal);
+
     return true;
+}
+
+bool SRE_Line_intersection(vec3 start, sre_collision_context *context, void (*col_handler)(sre_collision_context *, void *))
+{
+    vec3 plane_normal;
+    bool intersects;
+    if (context->type == COL_BSP_TREE)
+    {
+        intersects = SRE_Line_intersection_bsp_tree(start, context);
+    }
+    else if (context->type == COL_AABB)
+    {
+        sre_coldat_aabb expanded_col;
+        sre_coldat_aabb col_data;
+        SRE_Expand_collision(context->moving_collider, context->coldat, &expanded_col);
+        intersects = SRE_Line_intersection_aabb(start, context);
+    }
+    if (intersects)
+    {
+        col_handler(context, NULL);
+    }
+    
+    return intersects;
 }
 
 bool SRE_Col_load(sre_collider *col)
@@ -319,12 +330,6 @@ void SRE_Col_translate(sre_collider *col, vec3 xyz)
 {
     switch (col->type)
     {
-    case COL_CAPSULE:
-        SRE_Col_translate_capsule(col->data, xyz);
-        break;
-    case COL_SPHERE:
-        SRE_Col_translate_sphere(col->data, xyz);
-        break;
     case COL_AABB:
         SRE_Col_translate_aabb(col->data, xyz);
         break;
@@ -334,26 +339,13 @@ void SRE_Col_translate(sre_collider *col, vec3 xyz)
     }
 }
 
-void SRE_Col_translate_capsule(sre_coldat_capsule *capsule, vec3 xyz)
-{
-    capsule->center[0] += xyz[0];
-    capsule->center[1] += xyz[2];
-    capsule->ymax += xyz[1];
-    capsule->ymin += xyz[1];
-}
-
-void SRE_Col_translate_sphere(sre_coldat_sphere *sphere, vec3 xyz)
-{
-    glm_vec3_add(sphere->center, xyz, sphere->center);
-}
-
 void SRE_Col_translate_aabb(sre_coldat_aabb *aabb, vec3 xyz)
 {
     glm_vec3_add(aabb->min_pt, xyz, aabb->min_pt);
     glm_vec3_add(aabb->max_pt, xyz, aabb->max_pt);
 }
 
-bool SRE_Create_mbb(sre_collider *col_out, vec3 *coords, unsigned int n)
+bool SRE_Create_mesh_boudning_box(sre_collider *col_out, vec3 *coords, unsigned int n)
 {
     col_out->type = COL_AABB;
     if (col_out->data == NULL)
@@ -518,225 +510,75 @@ bool SRE_Col_test_aabbs(sre_coldat_aabb *col_1, sre_coldat_aabb *col_2)
         (col_1->max_pt[2] >= col_2->min_pt[2]);
 }
 
-bool SRE_Col_test_spheres(sre_coldat_sphere *col_1, sre_coldat_sphere *col_2) {
-    float dist = glm_vec3_distance(col_1->center, col_2->center);
-    return (col_1->r + col_2->r) <= dist;
-}
-
-bool SRE_Col_test_capsule_sphere(sre_coldat_capsule *capsule, sre_coldat_sphere *sphere) {
-    if (sphere->center[1] > capsule->ymax)
-    {
-        sre_coldat_sphere upper_sphere;
-        upper_sphere.center[0] = capsule->center[0];
-        upper_sphere.center[1] = capsule->ymax;
-        upper_sphere.center[2] = capsule->center[2];
-        upper_sphere.r = capsule->r;
-        return SRE_Col_test_spheres(&upper_sphere, sphere);
-    }
-
-    if (sphere->center[1] < capsule->ymin)
-    {
-        sre_coldat_sphere lower_sphere;
-        lower_sphere.center[0] = capsule->center[0];
-        lower_sphere.center[1] = capsule->ymin;
-        lower_sphere.center[2] = capsule->center[2];
-        lower_sphere.r = capsule->r;
-        return SRE_Col_test_spheres(&lower_sphere, sphere);
-    }
-    vec2 center_2;
-    center_2[0] = sphere->center[0]; 
-    center_2[1] = sphere->center[2]; 
-    
-    float dist = glm_vec2_distance(capsule->center, center_2);
-    return (capsule->r  + sphere->r) <= dist;
-}
-
-bool SRE_Col_test_capsules(sre_coldat_capsule *col_1, sre_coldat_capsule *col_2) {
-    if (col_1->ymin > col_2->ymax)
-    {
-        sre_coldat_sphere upper_sphere;
-        upper_sphere.center[0] = col_2->center[0];
-        upper_sphere.center[1] = col_2->ymax;
-        upper_sphere.center[2] = col_2->center[2];
-        upper_sphere.r = col_2->r;
-
-        sre_coldat_capsule lower_sphere;
-        lower_sphere.center[0] = col_1->center[0];
-        lower_sphere.center[1] = col_1->ymin;
-        lower_sphere.center[2] = col_1->center[2];
-        lower_sphere.r = col_1->r;
-        return SRE_Col_test_spheres(&upper_sphere, &lower_sphere);
-    }
-
-    if (col_2->ymin > col_1->ymax)
-    {
-        sre_coldat_sphere upper_sphere;
-        upper_sphere.center[0] = col_1->center[0];
-        upper_sphere.center[1] = col_1->ymax;
-        upper_sphere.center[2] = col_1->center[2];
-        upper_sphere.r = col_1->r;
-
-        sre_coldat_capsule lower_sphere;
-        lower_sphere.center[0] = col_2->center[0];
-        lower_sphere.center[1] = col_2->ymin;
-        lower_sphere.center[2] = col_2->center[2];
-        lower_sphere.r = col_2->r;
-        return SRE_Col_test_spheres(&upper_sphere, &lower_sphere);
-    }
-
-    float dist = glm_vec2_distance(col_1->center, col_2->center);
-    return (col_1->r  + col_2->r) <= dist;
-}
-
-bool SRE_Col_test_capsule_aabb(sre_coldat_capsule *capsule, sre_coldat_aabb *aabb) {
-    if (aabb->min_pt[1] > capsule->ymax)
-    {
-        sre_coldat_sphere upper_sphere;
-        upper_sphere.center[0] = capsule->center[0];
-        upper_sphere.center[1] = capsule->ymax;
-        upper_sphere.center[2] = capsule->center[2];
-        upper_sphere.r = capsule->r;
-        return SRE_Col_test_aabb_sphere(&upper_sphere, aabb);
-    }
-    
-    if (aabb->max_pt[1] < capsule->ymin)
-    {
-        sre_coldat_sphere lower_sphere;
-        lower_sphere.center[0] = capsule->center[0];
-        lower_sphere.center[1] = capsule->ymin;
-        lower_sphere.center[2] = capsule->center[2];
-        lower_sphere.r = capsule->r;
-        return SRE_Col_test_aabb_sphere(&lower_sphere, aabb);
-    }
-
-    float x = fmax(aabb->min_pt[0], fmin(aabb->max_pt[0], capsule->center[0]));
-    float z = fmax(aabb->min_pt[2], fmin(aabb->max_pt[2], capsule->center[1]));
-    float dist = glm_vec2_distance((vec2){x, z}, capsule->center);
-    return dist <= capsule->r;
-}
-
 bool SRE_Col_test_aabb_bsp_tree(sre_coldat_aabb *aabb, sre_coldat_bsp_tree *bsp_tree)
 {
+
+
     return false;
 }
 
-void SRE_Expand_collision(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col)
+void SRE_Expand_collision(sre_coldat_aabb *coldat_moving, sre_coldat_aabb *coldat_static, sre_coldat_aabb *coldat_expanded)
 {
-    // only aabb for now, might add other types of colliders
-    expanded_col->type = COL_AABB;
-    sre_coldat_aabb *data_expanded = expanded_col->data;
-    sre_coldat_aabb *data_static = static_col->data;
-    sre_coldat_aabb *data_moving = moving_col->data;
-    float dx_2 = (data_moving->max_pt[0] - data_moving->min_pt[0]) / 2;
-    float dy_2 = (data_moving->max_pt[1] - data_moving->min_pt[1]) / 2;
-    float dz_2 = (data_moving->max_pt[2] - data_moving->min_pt[2]) / 2;
-    data_expanded->max_pt[0] = data_static->max_pt[0] + dx_2;
-    data_expanded->max_pt[1] = data_static->max_pt[1] + dy_2;
-    data_expanded->max_pt[2] = data_static->max_pt[2] + dz_2;
-    data_expanded->min_pt[0] = data_static->min_pt[0] - dx_2;
-    data_expanded->min_pt[1] = data_static->min_pt[1] - dy_2;
-    data_expanded->min_pt[2] = data_static->min_pt[2] - dz_2;
+    float dx_2 = (coldat_moving->max_pt[0] - coldat_moving->min_pt[0]) / 2;
+    float dy_2 = (coldat_moving->max_pt[1] - coldat_moving->min_pt[1]) / 2;
+    float dz_2 = (coldat_moving->max_pt[2] - coldat_moving->min_pt[2]) / 2;
+    coldat_expanded->max_pt[0] = coldat_static->max_pt[0] + dx_2;
+    coldat_expanded->max_pt[1] = coldat_static->max_pt[1] + dy_2;
+    coldat_expanded->max_pt[2] = coldat_static->max_pt[2] + dz_2;
+    coldat_expanded->min_pt[0] = coldat_static->min_pt[0] - dx_2;
+    coldat_expanded->min_pt[1] = coldat_static->min_pt[1] - dy_2;
+    coldat_expanded->min_pt[2] = coldat_static->min_pt[2] - dz_2;
 }
 
-// unused for now
-/*
-void expand_sphere_with_sphere(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col)
+void SRE_Col_handler_solid(sre_collision_context *context, void *args)
 {
-    expanded_col->type = COL_SPHERE;
-    expanded_col->data = malloc(sizeof(sre_coldat_sphere));
-    sre_coldat_sphere *coldata_moving = (sre_coldat_sphere*)moving_col->data;
-    sre_coldat_sphere *coldata_static = (sre_coldat_sphere*)static_col->data;
-    sre_coldat_sphere *coldata_exp = (sre_coldat_sphere*)expanded_col->data;
-    glm_vec3_copy(coldata_static->center, coldata_exp->center);
-    coldata_exp->r = coldata_static->r + coldata_moving->r;
-}
-
-void expand_capsule_with_sphere(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col)
-{
-    expanded_col->type = COL_CAPSULE;
-    expanded_col->data = malloc(sizeof(sre_coldat_capsule));
-    sre_coldat_sphere *coldata_moving = (sre_coldat_sphere*)moving_col->data;
-    sre_coldat_capsule *coldata_static = (sre_coldat_capsule*)static_col->data;
-    sre_coldat_capsule *coldata_exp = (sre_coldat_capsule*)expanded_col->data;
-    glm_vec2_copy(coldata_static->center, coldata_exp->center);
-    coldata_exp->ymax = coldata_static->ymax + coldata_moving->r;
-    coldata_exp->ymin = coldata_static->ymin + coldata_moving->r;
-    coldata_exp->r = coldata_static->r + coldata_moving->r;
-}
-*/
-
-/*
-void expand_collision(sre_collider *moving_col, sre_collider *static_col, sre_collider *expanded_col)
-{
+    vec3 penetration, proj, start;
+    glm_vec3_sub(context->end, context->intersection, penetration);
+    float proj_mag = glm_vec3_dot(penetration, context->normal);
+    glm_vec3_scale(context->normal, proj_mag, proj);
+    glm_vec3_sub(context->end, proj, context->end);
+    glm_vec3_copy(context->intersection, start);
     
-    switch (moving_col->type | (static_col->type << 1))
+    switch (context->type)
     {
-    case COL_SPHERE | (COL_SPHERE << 1):
+        case COL_AABB:
         {
-            expand_sphere_with_sphere(moving_col, static_col, expanded_col);
+            sre_coldat_aabb *coldat = (sre_coldat_aabb *)context->coldat;
+            for (size_t i = 0; i < 3; i++)
+            {
+                context->end[i] = glm_clamp(context->end[i], coldat->min_pt[i] - 0.01f, coldat->max_pt[i] + 0.01f);
+            }
             break;
         }
-    case COL_SPHERE | (COL_CAPSULE << 1):
-        {
-            
-            break;
-        }
-    case COL_SPHERE | (COL_AABB << 1):
-        {
-            expanded_col->type = COL_AABB;
-            expanded_col->data = malloc(sizeof(sre_coldat_aabb));
-            sre_coldat_sphere *coldata_moving = (sre_coldat_sphere*)moving_col->data;
-            sre_coldat_aabb *coldata_static = (sre_coldat_aabb*)static_col->data;
-            sre_coldat_aabb *coldata_exp = (sre_coldat_aabb*)expanded_col->data;
-            coldata_exp->max_pt[0] = coldata_static->max_pt[0] + coldata_moving->r;
-            coldata_exp->max_pt[1] = coldata_static->max_pt[1] + coldata_moving->r;
-            coldata_exp->max_pt[2] = coldata_static->max_pt[2] + coldata_moving->r;
+        case COL_BSP_TREE:
+        { 
+            bool result = false;
+            vec3 old_normal;
+            vec3 old_start;
+            glm_vec3_copy(start, old_start);
+            glm_vec3_copy(context->normal, old_normal);
+            while (!result)
+            {
+                sre_coldat_bsp_tree *root = (sre_coldat_bsp_tree *)context->coldat;
+                uint16_t front = root[context->bsp_tree_parent].children[0];
+                if (front == BSP_EMPTY)
+                {
+                    return;
+                }
+                context->bsp_tree_index = front;
+                result = SRE_Line_intersection_bsp_tree(start, context);
+            }
 
-            coldata_exp->min_pt[0] = coldata_static->min_pt[0] + coldata_moving->r;
-            coldata_exp->min_pt[1] = coldata_static->min_pt[1] + coldata_moving->r;
-            coldata_exp->min_pt[2] = coldata_static->min_pt[2] + coldata_moving->r;
-            break;
-        }
-    case COL_CAPSULE | (COL_SPHERE << 1):
-        {
-            expanded_col->type = COL_CAPSULE;
-            expanded_col->data = malloc(sizeof(sre_coldat_capsule));
-            sre_coldat_capsule *coldata_moving = (sre_coldat_capsule*)moving_col->data;
-            sre_coldat_sphere *coldata_static = (sre_coldat_sphere*)static_col->data;
-            sre_coldat_capsule *coldata_exp = (sre_coldat_capsule*)expanded_col->data;
-            coldata_exp->center[0] = coldata_static->center[0];
-            coldata_exp->center[1] = coldata_static->center[2];
-            coldata_exp->ymax = coldata_moving->ymax;
-            coldata_exp->ymin = coldata_moving->ymin;
-            coldata_exp->r = coldata_moving->r + coldata_static->r;
-            break;
-        }
-    case COL_CAPSULE | (COL_CAPSULE << 1):
-        {
+            if (result)
+            {
+                //vec3 normal;
+                //glm_vec3_scale(context->normal, 0.1, normal);
+                //glm_vec3_add(context->intersection, normal, context->end);
+                glm_vec3_copy(context->intersection, context->end);
+            }
             
+
             break;
         }
-    case COL_CAPSULE | (COL_AABB << 1):
-        {
-            break;
-        }
-    case COL_AABB | (COL_SPHERE << 1):
-        {
-            break;
-        }
-    case COL_AABB | (COL_AABB << 1):
-        {
-            break;
-        }
-    case COL_AABB | (COL_CAPSULE << 1):
-        {
-            break;
-        }
-    default:
-        break;
     }
 }
-*/
-
-
-

@@ -1,0 +1,6 @@
+mtl checkerboard_room_mat
+diffuse_tex bareTexAtl
+specular 0.0
+specular_exp 1.0
+emission 0.0 0.0 0.0
+endobj

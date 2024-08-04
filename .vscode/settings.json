@@ -53,6 +53,15 @@
         "controlable.h": "c",
         "common.h": "c",
         "shaders.h": "c",
-        "mem_allocation.h": "c"
+        "mem_allocation.h": "c",
+        "mesh.h": "c",
+        "armature.h": "c",
+        "asset_import.h": "c",
+        "vec2.h": "c",
+        "importer.h": "c",
+        "errors.h": "c",
+        "sdl.h": "c",
+        "material.h": "c",
+        "typeinfo": "c"
     }
 }

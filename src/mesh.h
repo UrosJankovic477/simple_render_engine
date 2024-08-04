@@ -22,7 +22,7 @@ typedef struct struct_sre_mesh
     GLuint vao;
     GLuint vbo;
     uint64_t vertex_count;
-    sre_float_vec3 *vertex_positions;
+    vec3 *vertex_positions;
     sre_2_10_10_10s *vertex_normals;
     uint64_t index_count;
     uint64_t *vertex_indices;
