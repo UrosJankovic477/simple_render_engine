@@ -13,9 +13,11 @@ int SRE_Import_asset(sre_importer *importer, const char *filepath, bool always_l
     uint16_t mesh_idx = 0;
     char directory[256];
     unsigned long long last_slash = strrchr(filepath, '/');
+    uint8_t directory_size = ((last_slash - (unsigned long long)filepath) + 1);
+    directory_size = directory_size < 256 ? directory_size : 256;
     if (last_slash)
     {
-        strncpy_s(directory, 256, filepath, (last_slash - (unsigned long long)filepath) + 1);
+        strncpy(directory, filepath, directory_size);
     }
     char *filename;
     size_t filepath_len = strlen(filepath);
@@ -32,7 +34,7 @@ int SRE_Import_asset(sre_importer *importer, const char *filepath, bool always_l
         case SRE_MESH:
         {
             const char *name = strtok(NULL, blank_chars);
-            strcpy_s(object.name, 64, name);
+            strncpy(object.name, name, 64);
             SRE_Mempool_alloc(asset_mempool, &object.object, sizeof(sre_mesh));
             
             SRE_Importer_add_object(importer, object);
@@ -49,7 +51,7 @@ int SRE_Import_asset(sre_importer *importer, const char *filepath, bool always_l
         case SRE_MTL:
         {
             const char *name = strtok(NULL, blank_chars);
-            strcpy_s(object.name, 64, name);
+            strncpy(object.name, name, 64);
             SRE_Mempool_alloc(asset_mempool, &object.object, sizeof(sre_material));
             SRE_Importer_add_object(importer, object);
             fgetpos(file, &position);
@@ -65,7 +67,7 @@ int SRE_Import_asset(sre_importer *importer, const char *filepath, bool always_l
         {
             sre_object object;
             const char *name = strtok(NULL, blank_chars);
-            strcpy_s(object.name, 64, name);
+            strncpy(object.name, name, 64);
             SRE_Mempool_alloc(asset_mempool, &object.object, sizeof(sre_armature));
             SRE_Importer_add_object(importer, object);
             fpos_t position;
@@ -103,7 +105,7 @@ int SRE_Import_collision(sre_importer *importer, const char *filepath, bool alwa
     char buffer[64];
     fgets(buffer, 64, file);
     const char *name = strtok(buffer, blank_chars);
-    strcpy_s(collider_object.name, 64, name);
+    strncpy(collider_object.name, name, 64);
     SRE_Importer_add_object(importer, collider_object);
 
     uint16_t size;

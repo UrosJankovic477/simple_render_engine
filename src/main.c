@@ -11,20 +11,25 @@
 #include "shaders.h"
 #include "props.h"
 #include "errors.h"
+#include "mem_allocation.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #define DEG2RAD(x) M_PI / 180 * (x)
 
+
 int main(int argc, char **argv)
 {
-    // SRE_Init
+    // Init
+
     int status = SRE_Mempool_create(NULL, &main_mempool, (size_t)1073741824);
     if (status != SRE_SUCCESS)
     {
         return EXIT_FAILURE;
     }
-    
 
     SDL_Init(SDL_INIT_VIDEO);
     SDL_GL_LoadLibrary(NULL);
@@ -70,39 +75,19 @@ int main(int argc, char **argv)
     {
         exit(EXIT_FAILURE);
     }
-    //int compiled_veretex_unlit_shader = compile_shader("../src/shaders/vertex_unlit.glsl", GL_VERTEX_SHADER, &vertex_unlit_shader);
-    //if (compiled_veretex_unlit_shader == GL_SHADER_COMPILED_FALSE)
-    //{
-    //    exit(EXIT_FAILURE);
-    //}
-    //int compiled_fragment_unlit_shader = compile_shader("../src/shaders/fragment_unlit.glsl", GL_FRAGMENT_SHADER, &fragment_unlit_shader);
-    //if (compiled_fragment_unlit_shader == GL_SHADER_COMPILED_FALSE)
-    //{
-    //    exit(EXIT_FAILURE);
-    //}
-    //int compiled_alpha_clip_fragment_shader = SRE_Compile_shader("../src/shaders/alpha_clip_fragment.glsl", GL_FRAGMENT_SHADER, &alpha_clip_shader);
-    //if (compiled_alpha_clip_fragment_shader == GL_SHADER_COMPILED_FALSE)
-    //{
-    //    exit(EXIT_FAILURE);
-    //}
-
 
     sre_program program;
-    //sre_program program_alpha_clip;
-    //sre_program program_unlit;
 
     SRE_Create_shader_program(&program, vertex_shader, fragment_shader);
-    //SRE_Create_shader_program(&program_alpha_clip, vertex_shader, alpha_clip_shader);
-    //create_shader_program(&program_unlit, vertex_unlit_shader, fragment_unlit_shader);
 
     SRE_Init_postproc();
 
     glUseProgram(program.id);
 
-    sre_camera cam;
-    sre_cntl_handle cam_cntl;
-    SRE_Create_cntl(&cam_cntl, 0, 0, 10, 20, (vec3){0, 0, 2}, (vec3){0, 1, 0});
-    SRE_Cam_init(&cam, &cam_cntl, 0.01f, 200.0f, ((float)width / (float)height), glm_rad(90.0f));
+    sre_camera main_cam;
+    sre_cntl_handle main_cam_cntl;
+    SRE_Create_cntl(&main_cam_cntl, 0, 0, 10, 20, (vec3){0, 0, 2}, (vec3){0, 1, 0});
+    SRE_Cam_init(&main_cam, &main_cam_cntl, 0.01f, 200.0f, ((float)width / (float)height), glm_rad(90.0f));
     
     sre_importer importer;
     
@@ -115,16 +100,16 @@ int main(int argc, char **argv)
     SRE_Import_asset(&importer, "../resources/models/checkerboard.smsh", true);
     SRE_Import_collision(&importer, "../resources/models/checkerboard.scol", true);
     
-    SRE_Cam_set_view_mat(&cam);
-    SRE_Cam_set_proj_mat(&cam);
+    SRE_Cam_set_view_mat(&main_cam);
+    SRE_Cam_set_proj_mat(&main_cam);
 
     glEnable(GL_DEPTH_BUFFER_BIT);
 
     glViewport(0, 0, width, height);
     glClearColor(0.0f, 0.03125f, 0.125f, 1.0f);
 
-    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, cam.proj);
-    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, cam.view);
+    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, main_cam.proj);
+    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, main_cam.view);
 
     sre_light light1;
     glm_vec4_copy((vec4){0.0f, 5.0f, 2.0f, 1.0f}, light1.position);
@@ -226,7 +211,7 @@ int main(int argc, char **argv)
             {
                 int numkeys;
                 Uint8 *keystates = SDL_GetKeyboardState(&numkeys);
-                cam.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_W] |
+                main_cam.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_W] |
                                     CTL_DIR_BACK * keystates[SDL_SCANCODE_S] |
                                     CTL_DIR_UP * keystates[SDL_SCANCODE_SPACE] |
                                     CTL_DIR_DOWN * keystates[SDL_SCANCODE_LSHIFT] |
@@ -249,7 +234,7 @@ int main(int argc, char **argv)
             }
             case SDL_MOUSEMOTION:
             {
-                cam.cntl->flags = cam.cntl->flags | CTL_MOUSE_MOVEMENT;
+                main_cam.cntl->flags = main_cam.cntl->flags | CTL_MOUSE_MOVEMENT;
                 xrel = event.motion.xrel;
                 yrel = event.motion.yrel;
                 break;
@@ -258,7 +243,7 @@ int main(int argc, char **argv)
             {
                 int numkeys;
                 Uint8 *keystates = SDL_GetKeyboardState(&numkeys);
-                cam.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_W] |
+                main_cam.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_W] |
                                     CTL_DIR_BACK * keystates[SDL_SCANCODE_S] |
                                     CTL_DIR_UP * keystates[SDL_SCANCODE_SPACE] |
                                     CTL_DIR_DOWN * keystates[SDL_SCANCODE_LSHIFT] |
@@ -279,15 +264,15 @@ int main(int argc, char **argv)
             }
             
         }
-        if (cam.cntl->flags)
+        if (main_cam.cntl->flags)
         {
-            SRE_Cam_update_pos(&cam, dt, (float)xrel / (float)0x1fu, (float)yrel / (float)0x1fu);
+            SRE_Cam_update_pos(&main_cam, dt, (float)xrel / (float)0x1fu, (float)yrel / (float)0x1fu);
 
-            SRE_Cam_set_view_mat(&cam);
-            SRE_Cam_set_proj_mat(&cam);
+            SRE_Cam_set_view_mat(&main_cam);
+            SRE_Cam_set_proj_mat(&main_cam);
 
-            glProgramUniformMatrix4fv(program.id, SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, cam.proj);
-            glProgramUniformMatrix4fv(program.id, SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, cam.view);
+            glProgramUniformMatrix4fv(program.id, SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, main_cam.proj);
+            glProgramUniformMatrix4fv(program.id, SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, main_cam.view);
         
             //glProgramUniformMatrix4fv(program_alpha_clip.id, SRE_Get_uniform_location(&program_alpha_clip, "proj"), 1, GL_FALSE, cam.proj);
             //glProgramUniformMatrix4fv(program_alpha_clip.id, SRE_Get_uniform_location(&program_alpha_clip, "view"), 1, GL_FALSE, cam.view);       
@@ -326,7 +311,6 @@ int main(int argc, char **argv)
     SRE_Delete_postproc_plane();
     printf("[done]\n");
     printf("deleting geometry...   ");
-    //delete_terrain_vertices(&terrain);
     SRE_Mempool_destroy(&main_mempool);
 
     printf("[done]\n");

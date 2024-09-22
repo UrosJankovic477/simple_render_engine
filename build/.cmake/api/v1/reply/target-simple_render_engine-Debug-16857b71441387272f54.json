@@ -30,7 +30,7 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 28,
+				"line" : 29,
 				"parent" : 0
 			},
 			{
@@ -42,13 +42,13 @@
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 31,
+				"line" : 32,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 0,
-				"line" : 29,
+				"line" : 30,
 				"parent" : 0
 			}
 		]
@@ -92,8 +92,7 @@
 				17,
 				18,
 				19,
-				20,
-				21
+				20
 			]
 		}
 	],
@@ -192,14 +191,14 @@
 				17,
 				18,
 				19,
-				20,
-				21
+				20
 			]
 		},
 		{
 			"name" : "Header Files",
 			"sourceIndexes" : 
 			[
+				21,
 				22,
 				23,
 				24,
@@ -471,9 +470,7 @@
 				290,
 				291,
 				292,
-				293,
-				294,
-				295
+				293
 			]
 		}
 	],
@@ -507,12 +504,6 @@
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
 			"path" : "src/collision.c",
-			"sourceGroupIndex" : 0
-		},
-		{
-			"backtrace" : 1,
-			"compileGroupIndex" : 0,
-			"path" : "src/common.c",
 			"sourceGroupIndex" : 0
 		},
 		{
@@ -1899,11 +1890,6 @@
 		{
 			"backtrace" : 1,
 			"path" : "src/collision.h",
-			"sourceGroupIndex" : 1
-		},
-		{
-			"backtrace" : 1,
-			"path" : "src/common.h",
 			"sourceGroupIndex" : 1
 		},
 		{

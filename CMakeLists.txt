@@ -8,7 +8,7 @@ file(GLOB_RECURSE SOURCE_FILES
 ${CMAKE_SOURCE_DIR}/src/*.c
 ${CMAKE_SOURCE_DIR}/src/*.cpp)
 
-file(GLOB_RECURSE HEADER_FILES 
+file(GLOB_RECURSE HEADER_FILES
 ${CMAKE_SOURCE_DIR}/src/*.h
 ${CMAKE_SOURCE_DIR}/src/*.hpp
 ${CMAKE_SOURCE_DIR}/include/*.h
@@ -25,12 +25,19 @@ find_library(CGLM HINTS ${CMAKE_SOURCE_DIR}/lib)
 add_library(GLAD "./src/glad.c" "include")
 target_include_directories(GLAD PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
+
 add_executable(${PROJECT_NAME} ${SOURCE_FILES} ${HEADER_FILES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 set(LIBS opengl32 mingw32 SDL2MAIN SDL2 GLAD CGLM)
 target_link_libraries(${PROJECT_NAME} ${LIBS})
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--stack,20000000")
 
+
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+
+
+
+add_compile_options(-Wall, -O3)
+
 include(CPack)

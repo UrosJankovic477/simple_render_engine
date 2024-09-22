@@ -62,6 +62,8 @@
         "errors.h": "c",
         "sdl.h": "c",
         "material.h": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "windows.h": "c",
+        "plug.h": "c"
     }
 }

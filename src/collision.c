@@ -56,13 +56,11 @@ bool SRE_Line_intersection_bsp_tree(vec3 start, sre_collision_context *context)
     uint16_t index = context->bsp_tree_index;
     if (index == BSP_EMPTY)
     {
-        printf("empty region\n");
         return false;
     }
 
     if (index == BSP_SOLID)
     {
-        printf("solid region\n");
         glm_vec3_copy(start, context->intersection);
         return true;
     }
@@ -74,38 +72,51 @@ bool SRE_Line_intersection_bsp_tree(vec3 start, sre_collision_context *context)
     vec3 dx;
     glm_vec3_sub(context->end, start, dx);
     float t1 = glm_dot(start, normal);
-    float t2 = glm_dot(dx, normal);
+    float t2 = glm_dot(context->end, normal);
 
-    uint8_t side = t1 <= d;
+    uint8_t start_side = t1 <= d;
+    uint8_t end_side = t2 <= d;
 
-    bool intersects = false;
-    if (t2 != 0.0f)
+    
+    if (start_side == end_side)
     {
-        float t = (d - t1) / t2;
-        if (t >= 0.0f && t <= 1.0f)
-        {
-            intersects = true;
-            glm_vec3_copy(start, context->intersection);
-        }
-    }
-    glm_vec3_copy(normal, context->normal);
-    context->bsp_tree_parent = index;
-    if (intersects)
-    {
-        vec3 mid;
-        glm_vec3_copy(context->intersection, mid);
-        context->bsp_tree_index = node.children[1 - side];
-        bool result = SRE_Line_intersection_bsp_tree(mid, context);
-        if (result)
-        {
-            return result;
-        }
-        glm_vec3_copy(context->end, mid);
-        context->bsp_tree_index = node.children[side];
+        context->bsp_tree_index = node.children[start_side];
         return SRE_Line_intersection_bsp_tree(start, context);
     }
-    context->bsp_tree_index = node.children[side];
-    return SRE_Line_intersection_bsp_tree(start, context); 
+    
+    vec3 mid;
+
+    float t = (t1 - d) / (t1 - t2);
+
+    if (t > 0)
+    {
+        t -= 0.2f;
+    }
+    else
+    {
+        t += 0.2f;
+    }
+    
+    
+
+    glm_vec3_scale(dx, t, mid);
+    glm_vec3_add(mid, start, mid);
+
+    glm_vec3_copy(normal, context->normal);
+    context->bsp_tree_parent = index;
+
+    context->bsp_tree_index = node.children[start_side];
+    vec3 old_end;
+    glm_vec3_copy(context->end, old_end);
+    glm_vec3_copy(mid, context->end);
+    bool result = SRE_Line_intersection_bsp_tree(start, context);
+    if (result)
+    {
+        return result;
+    }
+    glm_vec3_copy(old_end, context->end);
+    context->bsp_tree_index = node.children[end_side];
+    return SRE_Line_intersection_bsp_tree(mid, context);
 }
 
 bool SRE_Line_intersection_aabb(vec3 start, sre_collision_context *context)
@@ -557,6 +568,7 @@ void SRE_Col_handler_solid(sre_collision_context *context, void *args)
             vec3 old_start;
             glm_vec3_copy(start, old_start);
             glm_vec3_copy(context->normal, old_normal);
+            uint16_t old_front = BSP_EMPTY;
             while (!result)
             {
                 sre_coldat_bsp_tree *root = (sre_coldat_bsp_tree *)context->coldat;
@@ -565,6 +577,12 @@ void SRE_Col_handler_solid(sre_collision_context *context, void *args)
                 {
                     return;
                 }
+                if (front == old_front)
+                {
+                    glm_vec3_copy(old_start, context->intersection);
+                    return;
+                }
+                old_front = front;
                 context->bsp_tree_index = front;
                 result = SRE_Line_intersection_bsp_tree(start, context);
             }

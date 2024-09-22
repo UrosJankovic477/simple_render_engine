@@ -35,7 +35,7 @@ int SRE_Armature_process(sre_importer *importer, sre_mempool *asset_mempool, FIL
                 action_idx += 1;
                 kf_idx = -1;
                 const char *name = strtok(NULL, blank_chars);
-                strcpy_s(armature->actions[action_idx].name, 64, name);
+                strncpy(armature->actions[action_idx].name, name, 64);
                 armature->actions[action_idx].bone_count = armature->bone_count;
                 break;
             case SRE_KF_COUNT:

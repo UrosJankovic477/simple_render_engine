@@ -16,13 +16,13 @@ int SRE_Material_process(sre_importer *importer, sre_mempool *asset_mempool, FIL
                 int status = SRE_Importer_get_object(importer, texture_name, &texture_object);
                 if (status != SRE_SUCCESS)
                 {
-                    strcpy(texture_object.name, texture_name);
+                    strncpy(texture_object.name, texture_name, 64);
                     texture_object.mempool = asset_mempool;
                     SRE_Mempool_alloc(asset_mempool, &texture_object.object, sizeof(sre_texture));
                     const char *extension = ".png";
                     char texture_path[256] = "..\\resources\\textures\\";
-                    strcat_s(texture_path, 256, texture_name);
-                    strcat_s(texture_path, 256, extension);
+                    strncat(texture_path, texture_name, 256);
+                    strncat(texture_path, extension, 256);
                     int result = SRE_Load_texture(texture_path, (sre_texture*)texture_object.object);
                     if (result != SRE_SUCCESS)
                     {
