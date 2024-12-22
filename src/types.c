@@ -1,4 +1,4 @@
-#include "types.h"
+#include <sre/types.h>
 #include <stdio.h>
 
 uint8_t SRE_Float_to_unorm_8(float flp)
@@ -17,7 +17,7 @@ sre_norm_16 SRE_Float_to_fixed_16(float flp)
 {
     unsigned int ftoi = FLOAT_BITS(flp);
     unsigned int sign = ftoi & 0x80000000;
-    
+
     unsigned int exponent = ftoi & 0x7f800000;
     unsigned int mantissa = ftoi & 0x007fffff;
     mantissa = mantissa | 0x00800000;
@@ -37,7 +37,7 @@ sre_norm_16 SRE_Float_to_fixed_16(float flp)
     {
         return -fp;
     }
-    
+
     return fp;
 }
 
@@ -47,12 +47,12 @@ sre_norm_16 SRE_Cstrng_to_fixed(const char *cstr)
     char sign;
     if (cstr[0] == '-')
     {
-        strcpy_s(cstr_cpy, 18, cstr + 1);
+        strncpy(cstr_cpy, cstr + 1, 18);
         sign = 1;
     }
     else
     {
-        strcpy_s(cstr_cpy, 18, cstr);
+        strncpy(cstr_cpy, cstr, 18);
         sign = 0;
     }
     const char *padding = "00000000";
@@ -61,7 +61,7 @@ sre_norm_16 SRE_Cstrng_to_fixed(const char *cstr)
     char *cstr_upper;
     char cstr_lower[9];
     cstr_upper = strtok(cstr_cpy, ".");
-    strcpy_s(cstr_lower, 9, strtok(NULL, "\0"));
+    strncpy(cstr_lower, strtok(NULL, "\0"), 9);
     strncat(cstr_lower, padding, 8 - strlen(cstr_lower));
     fixed_upper = atoi(cstr_upper);
     fixed_lower = 0x0000;
@@ -93,30 +93,30 @@ sre_2_10_10_10s SRE_Float_to_2_10_10_10s(float flp_x, float flp_y, float flp_z)
 sre_rgba SRE_Vec4_to_rgba(float r, float g, float b, float a)
 {
     sre_rgba _rgba;
-    _rgba.color_vec.r = (sre_byte)(0xff * r);
-    _rgba.color_vec.g = (sre_byte)(0xff * g);
-    _rgba.color_vec.b = (sre_byte)(0xff * b);
-    _rgba.color_vec.a = (sre_byte)(0xff * a);
+    _rgba.r = (sre_byte)(0xff * r);
+    _rgba.g = (sre_byte)(0xff * g);
+    _rgba.b = (sre_byte)(0xff * b);
+    _rgba.a = (sre_byte)(0xff * a);
     return _rgba;
 }
 
 sre_rgba SRE_Vec3_to_rgb(float r, float g, float b)
 {
     sre_rgba _rgba;
-    _rgba.color_vec.r = (sre_byte)(0xff * r);
-    _rgba.color_vec.g = (sre_byte)(0xff * g);
-    _rgba.color_vec.b = (sre_byte)(0xff * b);
-    _rgba.color_vec.a = 0xff;
+    _rgba.r = (sre_byte)(0xff * r);
+    _rgba.g = (sre_byte)(0xff * g);
+    _rgba.b = (sre_byte)(0xff * b);
+    _rgba.a = 0xff;
     return _rgba;
 }
 
 sre_rgba SRE_Float_to_rgb(float c)
 {
     sre_rgba _rgba;
-    _rgba.color_vec.r = (sre_byte)(0xff * c);
-    _rgba.color_vec.g = _rgba.color_vec.r;
-    _rgba.color_vec.b = _rgba.color_vec.r;
-    _rgba.color_vec.a = 0xff;
+    _rgba.r = (sre_byte)(0xff * c);
+    _rgba.g = _rgba.r;
+    _rgba.b = _rgba.r;
+    _rgba.a = 0xff;
     return _rgba;
 }
 
@@ -186,4 +186,3 @@ int main(int argc, char const *argv[])
     return 0;
 }
 */
-

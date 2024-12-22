@@ -1,59 +1,117 @@
-#include "mem_allocation.h"
+#include <sre/mem_allocation.h>
 
-sre_mempool main_mempool;
-sre_mempool aux_mempool; 
+sre_bumpalloc main_allocator;
 
-int SRE_Mempool_reset(sre_mempool *mempool_ptr)
+int SRE_Bump_reset(sre_bumpalloc *bump)
 {
-    mempool_ptr->index = 0;
+    bump->index = 0;
     return SRE_SUCCESS;
 }
 
-int SRE_Mempool_alloc(sre_mempool *mempool_ptr, void **dest, size_t size)
+int SRE_Bump_alloc(sre_bumpalloc *bump, void **dest, size_t size)
 {
-    if (size <= 0 || size + mempool_ptr->index > mempool_ptr->size)        
+    if (size <= 0 || size + bump->index > bump->size)
     {
         return SRE_ERROR_NO_MEM;
     }
-    
-    *dest = (char*)mempool_ptr->data + mempool_ptr->index;
-    mempool_ptr->index += size;    
-    return SRE_SUCCESS;
-}
-
-int SRE_Mempool_create(sre_mempool *parent_pool_ptr, sre_mempool *mempool_ptr, size_t size)
-{
-    if (parent_pool_ptr == NULL)
+    size_t size_mod16 = size & 0xf;
+    if (size_mod16)
     {
-        mempool_ptr->data = malloc(size);
-        if (mempool_ptr->data == NULL)
-        {
-            return SRE_ERROR_NO_MEM;
-        }
-        
+        size += 16 - size_mod16;
     }
-    else {
-        int status = SRE_Mempool_alloc(parent_pool_ptr, &mempool_ptr->data, size);
-        if (status != SRE_SUCCESS)
-        {
-            return status;
-        }
-    }
-    mempool_ptr->parent = parent_pool_ptr;
-    mempool_ptr->index = 0;
-    mempool_ptr->size = size;
-    return SRE_SUCCESS;
-}
 
-int SRE_Mempool_destroy(sre_mempool *mempool_ptr)
-{
-    if (mempool_ptr->parent != NULL)
+    // checking freelist
+
+    if (size <= bump->freelist.largest_free_block)
     {
-        return SRE_ERROR;
+        sre_freelist_entry *current_free_block = bump->freelist.head;
+        sre_freelist_entry *prev_free_block = NULL;
+        while (current_free_block)
+        {
+            if (current_free_block->size >= size)
+            {
+                *dest = (uint8_t *)current_free_block;
+                sre_freelist_entry *next_free_block;
+                if (size == current_free_block->size)
+                {
+                    next_free_block = current_free_block->next;
+                }
+                else
+                {
+                    next_free_block = current_free_block + size;
+                    next_free_block->size = current_free_block->size - size;
+                    next_free_block->next = current_free_block->next;
+                }
+
+
+                if (prev_free_block == NULL)
+                {
+                    bump->freelist.head = next_free_block;
+                }
+                else
+                {
+                    prev_free_block->next = next_free_block;
+                }
+                return SRE_SUCCESS;
+            }
+
+            prev_free_block = current_free_block;
+            current_free_block = current_free_block->next;
+        }
+        return SRE_ERROR; // shouldn't be possible
     }
-    free(mempool_ptr->data);
-    mempool_ptr->data = NULL;
-    mempool_ptr->index = -1;
+
+    // if there's no free space in freelist just do normal bump aloc
+
+    *dest = (uint8_t *)bump->data + bump->index;
+    bump->index += size;
     return SRE_SUCCESS;
 }
 
+int SRE_Bump_free(sre_bumpalloc *bump, void **block, size_t size)
+{
+    if (*block + size == bump->index)
+    {
+        bump -= size;
+        *block = NULL;
+        return SRE_SUCCESS;
+    }
+
+    sre_freelist_entry *next_node = bump->freelist.head;
+    bump->freelist.head = (sre_freelist_entry *)(*block);
+    bump->freelist.head->size = size;
+    bump->freelist.head->next = next_node;
+    if (size > bump->freelist.largest_free_block)
+    {
+        bump->freelist.largest_free_block = size;
+    }
+
+    *block = NULL;
+
+    return SRE_SUCCESS;
+}
+
+int SRE_Bump_create(sre_bumpalloc *bump, size_t size)
+{
+    bump->data = malloc(size);
+    if (bump->data == NULL)
+    {
+        return SRE_ERROR_NO_MEM;
+    }
+
+    bump->index = 0;
+    bump->size = size;
+    bump->freelist.head = NULL;
+    bump->freelist.largest_free_block = 0;
+    return SRE_SUCCESS;
+}
+
+int SRE_Bump_destroy(sre_bumpalloc *bump)
+{
+    free(bump->data);
+    bump->data = NULL;
+    bump->index = -1;
+    bump->freelist.head = NULL;
+    bump->freelist.largest_free_block = 0;
+    return SRE_SUCCESS;
+}

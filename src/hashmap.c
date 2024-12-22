@@ -1,8 +1,8 @@
-#include "hashmap.h"
+#include <sre/hashmap.h>
 
-unsigned long get_string_hash(unsigned char *str)
+uint64_t get_string_hash(unsigned char *str)
 {
-    unsigned long hash = 5381;
+    uint64_t hash = 5381;
     int c;
 
     while (c = *str++)

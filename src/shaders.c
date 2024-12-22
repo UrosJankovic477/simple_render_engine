@@ -1,5 +1,4 @@
-#include "shaders.h"
-
+#include <sre/shaders.h>
 
 int SRE_Compile_shader(const char *p_shader_path, GLenum p_shader_type, GLuint *p_shader_obj)
 {
@@ -20,7 +19,7 @@ int SRE_Compile_shader(const char *p_shader_path, GLenum p_shader_type, GLuint *
         size += bytes_read;
     }
     buffer[size] = '\0';
-    
+
 
     *p_shader_obj = glCreateShader(p_shader_type);
     glShaderSource(*p_shader_obj, 1, (const char* const*)&buffer, (const GLint *)&size);
@@ -46,12 +45,12 @@ int SRE_Create_shader_program(sre_program *program, GLuint vertex_shader, GLuint
 
     program->uniforms_count = 0;
     program->id = glCreateProgram();
-    
+
     for (size_t i = 0; i < SH_MAX_UNIFORM_NUM; i++)
     {
         program->uniform_cache[i].location = -1;
     }
-    
+
     program->vertex_shader = vertex_shader;
     program->fragment_shader = fragment_shader;
 
@@ -90,7 +89,7 @@ int SRE_Get_uniform_location(sre_program *program, const char *uniform_name)
             }
         }
     }
-    program->uniform_cache[hash].location = glGetUniformLocation(program->id, uniform_name); 
+    program->uniform_cache[hash].location = glGetUniformLocation(program->id, uniform_name);
     program->uniform_cache[hash].name = uniform_name;
     uniform = program->uniform_cache[hash];
     program->uniforms_count++;

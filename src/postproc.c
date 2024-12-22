@@ -1,4 +1,4 @@
-#include "postproc.h"
+#include <sre/postproc.h>
 
 float postproc_plane[] = {
     -1.0f, -1.0f, 0.0f  ,  0.0f, 0.0f,
@@ -25,10 +25,10 @@ void SRE_Init_postproc()
     glGenBuffers(1, &postproc_plane_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, postproc_plane_vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(postproc_plane), postproc_plane, GL_STATIC_DRAW);
-    
+
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5*sizeof(GLfloat), NULL);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5*sizeof(GLfloat), (GLvoid*)(3*sizeof(GLfloat)));
-    
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
@@ -37,7 +37,7 @@ void SRE_Init_postproc()
     {
         exit(EXIT_FAILURE);
     }
-    
+
     int compiled_fragmet_shader = SRE_Compile_shader("../src/shaders/postproc_frag_shdr.glsl", GL_FRAGMENT_SHADER, &postproc_frag_shdr);
     if (compiled_fragmet_shader == GL_SHADER_COMPILED_FALSE)
     {

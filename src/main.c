@@ -1,22 +1,13 @@
 #include <glad/glad.h>
 #include <SDL2/SDL.h>
 #include <cglm/types.h>
-#include <cglm/cam.h>
-#include <cglm/mat4.h>
-#include "asset_import.h"
-#include "camera.h"
-#include "light.h"
-#include "terrain_generation.h"
-#include "postproc.h"
-#include "shaders.h"
-#include "props.h"
-#include "errors.h"
-#include "mem_allocation.h"
+#include <cglm/call/cam.h>
+#include <cglm/call/mat4.h>
+#include <sre/sre.h>
+
 #define _USE_MATH_DEFINES
 #include <math.h>
-#ifdef _WIN32
-#include <windows.h>
-#endif
+
 
 #define DEG2RAD(x) M_PI / 180 * (x)
 
@@ -25,7 +16,7 @@ int main(int argc, char **argv)
 {
     // Init
 
-    int status = SRE_Mempool_create(NULL, &main_mempool, (size_t)1073741824);
+    int status = SRE_Bump_create(&main_allocator, (size_t)0xffff);
     if (status != SRE_SUCCESS)
     {
         return EXIT_FAILURE;
@@ -38,10 +29,10 @@ int main(int argc, char **argv)
 
     int width = 480 * 2;
     int height = 360 * 2;
-    SDL_Window *window = 
+    SDL_Window *window =
     SDL_CreateWindow(   "TEST-APPLICATION",
-                        SDL_WINDOWPOS_UNDEFINED,
-                        SDL_WINDOWPOS_UNDEFINED,
+                        0,
+                        0,
                         width, height,
                         SDL_WINDOW_OPENGL);
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
@@ -56,7 +47,7 @@ int main(int argc, char **argv)
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     stbi_set_flip_vertically_on_load(1);
-    
+
     sre_framebuffer postproc_framebuffer;
     SRE_Framebuffer_init(&postproc_framebuffer, 240, 180, GL_RGB);
 
@@ -84,71 +75,65 @@ int main(int argc, char **argv)
 
     glUseProgram(program.id);
 
-    sre_camera main_cam;
-    sre_cntl_handle main_cam_cntl;
-    SRE_Create_cntl(&main_cam_cntl, 0, 0, 10, 20, (vec3){0, 0, 2}, (vec3){0, 1, 0});
-    SRE_Cam_init(&main_cam, &main_cam_cntl, 0.01f, 200.0f, ((float)width / (float)height), glm_rad(90.0f));
-    
-    sre_importer importer;
-    
-    SRE_Importer_init_default(&importer);
-    SRE_Import_asset(&importer, "../resources/models/python_testing.sarm", true);
-    SRE_Import_asset(&importer, "../resources/models/python_testing.smtl", true);
-    SRE_Import_asset(&importer, "../resources/models/python_testing.smsh", true);
+    sre_camera *main_camera;
+    sre_control_listener main_control_listener;
 
-    SRE_Import_asset(&importer, "../resources/models/checkerboard.smtl", true);
-    SRE_Import_asset(&importer, "../resources/models/checkerboard.smsh", true);
-    SRE_Import_collision(&importer, "../resources/models/checkerboard.scol", true);
-    
-    SRE_Cam_set_view_mat(&main_cam);
-    SRE_Cam_set_proj_mat(&main_cam);
+    SRE_Camera_create(&main_camera, "main_camera", (vec3) {0, 0, 8}, (vec3) {0, 0, 0}, 0.01f, 200.0f, ((float)width / (float)height), glm_rad(70.0f));
+    SRE_Control_create(&main_control_listener, 10, 0.5, SRE_Control_handler_default);
+    SRE_Control_listener_set_main(&main_control_listener);
+
+    // temporarely hardcode keyboard configuration
+
+    main_control_listener.keyboard_config[SRE_CONTROL_ACTION_FORWARD] = SDL_SCANCODE_W;
+    main_control_listener.keyboard_config[SRE_CONTROL_ACTION_LEFT] = SDL_SCANCODE_A;
+    main_control_listener.keyboard_config[SRE_CONTROL_ACTION_BACK] = SDL_SCANCODE_S;
+    main_control_listener.keyboard_config[SRE_CONTROL_ACTION_RIGHT] = SDL_SCANCODE_D;
+    main_control_listener.keyboard_config[SRE_CONTROL_ACTION_INTERACT] = SDL_SCANCODE_F;
+    main_control_listener.keyboard_config[SRE_CONTORL_ACTION_UP] = SDL_SCANCODE_SPACE;
+    main_control_listener.keyboard_config[SRE_CONTROL_ACTION_DOWN] = SDL_SCANCODE_LSHIFT;
+
+    SRE_Importer_init_default();
+    SRE_Import_asset("../resources/models/python_testing.sarm");
+    SRE_Import_asset("../resources/models/python_testing.smtl");
+    SRE_Import_asset("../resources/models/python_testing.smsh");
+
+    SRE_Import_asset("../resources/models/checkerboard.smtl");
+    SRE_Import_asset("../resources/models/checkerboard.smsh");
+    SRE_Import_collision("../resources/models/checkerboard.scol");
+
+    //SRE_Camera_set_view_mat(main_camera);
+    SRE_Camera_set_proj_mat(main_camera);
 
     glEnable(GL_DEPTH_BUFFER_BIT);
 
     glViewport(0, 0, width, height);
     glClearColor(0.0f, 0.03125f, 0.125f, 1.0f);
 
-    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, main_cam.proj);
-    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, main_cam.view);
+    //glUniformMatrix4fv(SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, main_camera->proj);
+    //glUniformMatrix4fv(SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, main_camera->view);
 
-    sre_light light1;
-    glm_vec4_copy((vec4){0.0f, 5.0f, 2.0f, 1.0f}, light1.position);
-    light1.radius = 20.0f;
-    light1.color.rgba = RGBA(255, 255, 255, 0);
+    sre_light *light1;
+    sre_rgba color;
+    color.r = 0;
+    color.g = 255;
+    color.b = 255;
+    color.a = 0;
+    SRE_Light_create(&light1, "light1", (vec3){0.0f, 0.0f, 0.0f}, color, 5.0f, false);
+    SRE_Light_push_uniform_array(light1, program);
 
-    SRE_Light_push_uniform_array(&light1, program);
-
-    sre_light light2;
-    glm_vec4_copy((vec4){16.0f, 4.5f, -5.0f, 1.0f}, light2.position);
-    light2.radius = 20.0f;
-    light2.color.rgba = RGBA(255, 0, 0, 0);
-
-    //SRE_Light_push_uniform_array(&light2, program);
- 
-    sre_light light3;
-    glm_vec4_copy((vec4){16.0f, 4.5f, -5.0f, 1.0f}, light3.position);
-    light3.radius = 30.0f;
-    light3.color.rgba = RGBA(0, 0, 255, 0);
-
-    //SRE_Light_push_uniform_array(&light3, program);
-
-    sre_light sun;
-    glm_vec4_copy((vec4){1.0f, 1.0f, 1.0f, 0.0f}, sun.position);
-    sun.color.rgba = RGBA(0x7f, 0x7f, 0x7f, 0x7f);
-    sun.radius = 0.0f;
-
-    SRE_Light_push_uniform_array(&sun, program);
+    sre_light *light2;
+    SRE_Light_create(&light2, "light2", (vec3){1.0f, 0.2f, 0.2f}, (sre_rgba)SRE_WHITE, 0.0f, true);
+    SRE_Light_push_uniform_array(light2, program);
 
     const GLubyte* vendor = glGetString(GL_VENDOR);
     const GLubyte* renderer = glGetString(GL_RENDERER);
 
     printf("vendor: %s\nrenderer %s\n", vendor, renderer);
 
-    int running = 1;
     SDL_Event event;
 
     Uint64 last = 0;
-    float dt = 0; 
+    float dt = 0;
     float lx = 0;
     float ly = 0;
     float lz = 0;
@@ -166,138 +151,102 @@ int main(int argc, char **argv)
     //sre_terrain terrain;
     //generate_terrain_vertices(100, 100, &terrain, 10);
 
-    sre_object squishy, room, collision;
-    SRE_Importer_get_object(&importer, "Cube", &squishy);
-    SRE_Importer_get_object(&importer, "checkerboard_room", &room);
-    SRE_Importer_get_object(&importer, "collision", &collision);
+    sre_game_object *squishy_mesh, *room_mesh, *collision;
+    SRE_Game_object_get("Cube", &squishy_mesh);
+    SRE_Game_object_get("checkerboard_room", &room_mesh);
+    SRE_Game_object_get("collision", &collision);
 
-    sre_cntl_handle cntl;
+    sre_group *squishy, *room, *camera_group;
+    SRE_Group_create(&squishy, "squishy_group");
+    SRE_Group_create(&room, "room_group");
+    //SRE_Group_create(&camera_group, "camera_group");
+    main_camera->lookat = &squishy->transform.translation;
 
-    SRE_Create_cntl(&cntl, 0, 0, 2, 1, (vec3){0, 0, 0}, (vec3){0, 1, 0});
+    SRE_Group_add_component(squishy, (sre_game_object*)main_camera);
+    main_control_listener.moving_object = squishy;
 
-    sre_mesh *squishy_mesh = squishy.object;
-    SRE_Mesh_load(squishy_mesh);
-    sre_mesh *room_mesh = room.object;
-    SRE_Mesh_load(room_mesh);
-    sre_prop room_prop, squishy_prop;
-    SRE_Prop_create(room_mesh, collision.object, &room_prop, NULL);
-    SRE_Prop_create(squishy_mesh, NULL, &squishy_prop, &cntl);
-    SRE_Prop_gen_aabb(&squishy_prop, &importer.always_loaded_assets);
-    SRE_Prop_translate(&squishy_prop, (vec3){0, 1.0, 0});
+    SRE_Group_add_component(room, room_mesh);
+    SRE_Group_add_component(room, collision);
+
+
+    sre_collider *squishy_collider;
+    SRE_Aabb_from_mesh(squishy_mesh->mesh, &squishy_collider);
+    SRE_Group_add_component(squishy, squishy_mesh);
+    squishy->collider = squishy_collider;
     sre_action wiggle;
-    SRE_Action_get_by_name(squishy_mesh->armature, "wiggle", &wiggle);
+    SRE_Action_get_by_name(squishy_mesh->mesh.armature, "wiggle", &wiggle);
     SRE_Action_set_active(&wiggle);
-    SRE_Col_load(squishy_prop.collider);
-    SRE_Col_load(room_prop.collider);
+
+    SRE_Group_load(squishy);
+    SRE_Group_load(room);
+
     Uint64 now = SDL_GetPerformanceCounter();
-    while (running)
+    SRE_App_start();
+    while (SRE_App_running())
     {
         cam_updated = 0;
         xrel = 0;
         yrel = 0;
         last = now;
         now = SDL_GetPerformanceCounter();
-        dt = (float)((now - last) * 1000 / (float)SDL_GetPerformanceFrequency()) * 0.001;
-        
-        
+        dt = (double)((now - last) / (double)SDL_GetPerformanceFrequency());
+
         while (SDL_PollEvent(&event))
         {
             switch (event.type)
             {
             case SDL_QUIT:
-                running = 0;
+            {
+                SRE_App_quit();
                 break;
+            }
+            case SDL_WINDOWEVENT_FOCUS_GAINED:
+            {
+                SDL_SetWindowMouseGrab(window, SDL_TRUE);
+                SDL_ShowCursor(SDL_DISABLE);
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+                break;
+            }
             case SDL_KEYDOWN:
             {
-                int numkeys;
-                Uint8 *keystates = SDL_GetKeyboardState(&numkeys);
-                main_cam.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_W] |
-                                    CTL_DIR_BACK * keystates[SDL_SCANCODE_S] |
-                                    CTL_DIR_UP * keystates[SDL_SCANCODE_SPACE] |
-                                    CTL_DIR_DOWN * keystates[SDL_SCANCODE_LSHIFT] |
-                                    CTL_DIR_LEFT * keystates[SDL_SCANCODE_A] |
-                                    CTL_DIR_RIGHT * keystates[SDL_SCANCODE_D];
-
-                squishy_prop.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_DOWN] |
-                                    CTL_DIR_BACK * keystates[SDL_SCANCODE_UP] |
-                                    CTL_DIR_UP * keystates[SDL_SCANCODE_0] |
-                                    CTL_DIR_DOWN * keystates[SDL_SCANCODE_1] |
-                                    CTL_DIR_LEFT * keystates[SDL_SCANCODE_LEFT] |
-                                    CTL_DIR_RIGHT * keystates[SDL_SCANCODE_RIGHT];
-
-                if (keystates[SDL_SCANCODE_ESCAPE])
-                {
-                    running = 0;
-                    break;
-                }
+                SRE_Controls_handler(event, dt);
                 break;
             }
             case SDL_MOUSEMOTION:
             {
-                main_cam.cntl->flags = main_cam.cntl->flags | CTL_MOUSE_MOVEMENT;
-                xrel = event.motion.xrel;
-                yrel = event.motion.yrel;
+                SRE_Controls_handler(event, dt);
                 break;
             }
             case SDL_KEYUP:
             {
-                int numkeys;
-                Uint8 *keystates = SDL_GetKeyboardState(&numkeys);
-                main_cam.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_W] |
-                                    CTL_DIR_BACK * keystates[SDL_SCANCODE_S] |
-                                    CTL_DIR_UP * keystates[SDL_SCANCODE_SPACE] |
-                                    CTL_DIR_DOWN * keystates[SDL_SCANCODE_LSHIFT] |
-                                    CTL_DIR_LEFT * keystates[SDL_SCANCODE_A] |
-                                    CTL_DIR_RIGHT * keystates[SDL_SCANCODE_D];
-                
-                squishy_prop.cntl->flags = CTL_DIR_FRONT * keystates[SDL_SCANCODE_DOWN] |
-                                    CTL_DIR_BACK * keystates[SDL_SCANCODE_UP] |
-                                    CTL_DIR_UP * keystates[SDL_SCANCODE_0] |
-                                    CTL_DIR_DOWN * keystates[SDL_SCANCODE_1] |
-                                    CTL_DIR_LEFT * keystates[SDL_SCANCODE_LEFT] |
-                                    CTL_DIR_RIGHT * keystates[SDL_SCANCODE_RIGHT];
-
+                SRE_Controls_handler(event, dt);
                 break;
             }
             default:
                 break;
             }
-            
-        }
-        if (main_cam.cntl->flags)
-        {
-            SRE_Cam_update_pos(&main_cam, dt, (float)xrel / (float)0x1fu, (float)yrel / (float)0x1fu);
 
-            SRE_Cam_set_view_mat(&main_cam);
-            SRE_Cam_set_proj_mat(&main_cam);
+        }
 
-            glProgramUniformMatrix4fv(program.id, SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, main_cam.proj);
-            glProgramUniformMatrix4fv(program.id, SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, main_cam.view);
-        
-            //glProgramUniformMatrix4fv(program_alpha_clip.id, SRE_Get_uniform_location(&program_alpha_clip, "proj"), 1, GL_FALSE, cam.proj);
-            //glProgramUniformMatrix4fv(program_alpha_clip.id, SRE_Get_uniform_location(&program_alpha_clip, "view"), 1, GL_FALSE, cam.view);       
-        }
-        if (squishy_prop.cntl->flags)
-        {
-            SRE_Prop_control(&squishy_prop, dt, xrel, yrel);
-        }
-        
+        SRE_Control_update(&main_control_listener);
+
         glUseProgram(program.id);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // draw to postprocess framebuffer
-        
+        glUniformMatrix4fv(SRE_Get_uniform_location(&program, "proj"), 1, GL_FALSE, main_camera->proj);
+        glUniformMatrix4fv(SRE_Get_uniform_location(&program, "view"), 1, GL_FALSE, main_camera->view);
         glUniform1ui(SRE_Get_uniform_location(&program, "time"), now);
         SRE_Set_current_keyframes(program, now);
         // Draw here
-        SRE_Prop_draw(room_prop, program, false);
-        SRE_Mesh_draw(squishy_mesh, program);
+        SRE_Group_draw(room, program, SRE_GO_MESH);
+        SRE_Group_draw(squishy, program, SRE_GO_MESH);
 
         SRE_Draw_to_main_framebuffer(postproc_framebuffer, postproc_program, width, height);
         SRE_Framebuffer_bind(postproc_framebuffer, program.id);
         SDL_GL_SwapWindow(window);
     }
-    SRE_Mesh_unload(room_mesh);
-    SRE_Mesh_unload(squishy_mesh);
+    SRE_Group_unload(room);
+    SRE_Group_unload(squishy);
     SDL_DestroyWindow(window);
     SDL_Quit();
     printf("deleting shader programs...   ");
@@ -311,7 +260,7 @@ int main(int argc, char **argv)
     SRE_Delete_postproc_plane();
     printf("[done]\n");
     printf("deleting geometry...   ");
-    SRE_Mempool_destroy(&main_mempool);
+    SRE_Bump_destroy(&main_allocator);
 
     printf("[done]\n");
 
