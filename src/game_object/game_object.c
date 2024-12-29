@@ -85,12 +85,12 @@ sre_game_object_manager;
 
 static sre_game_object_manager go_manager;
 
-int SRE_Game_object_manager_init(size_t always_loaded_assets_size, size_t current_zone_assets_size)
+int SRE_Game_object_manager_init()
 {
     for (size_t i = 0; i < SRE_MAX_OBJECT_COUNT; i++)
     {
         SDL_zero(go_manager.object_table[i].object);
-        go_manager.object_table[i].collision = -1;
+        go_manager.object_table[i].collision = 0xffff;
     }
 
     go_manager.object_count = 0;
@@ -110,10 +110,12 @@ int SRE_Game_object_get(const char *name, sre_game_object **object)
     }
     if (idx == 0xffff)
     {
+        *object = NULL;
         return SRE_ERROR;
     }
     if (go_manager.object_table[idx].object == NULL)
     {
+        *object = NULL;
         return SRE_ERROR;
     }
 

@@ -3,7 +3,7 @@
 int SRE_Material_bind(sre_material *mtl, sre_program program)
 {
     glUniform1ui(SRE_Get_uniform_location(&program, "ks"), mtl->Ks);
-    glUniform1f(SRE_Get_uniform_location(&program, "ns"), mtl->Ns);
+    glUniform1ui(SRE_Get_uniform_location(&program, "ns"), mtl->Ns);
 
     if (mtl->map_Kd != NULL)
     {

@@ -21,6 +21,11 @@ int main(int argc, char **argv)
     {
         return EXIT_FAILURE;
     }
+    status = SRE_Game_object_manager_init();
+    if (status != SRE_SUCCESS)
+    {
+        return EXIT_FAILURE;
+    }
 
     SDL_Init(SDL_INIT_VIDEO);
     SDL_GL_LoadLibrary(NULL);
@@ -93,11 +98,11 @@ int main(int argc, char **argv)
     main_control_listener.keyboard_config[SRE_CONTROL_ACTION_DOWN] = SDL_SCANCODE_LSHIFT;
 
     SRE_Importer_init_default();
-    SRE_Import_asset("../resources/models/python_testing.sarm");
-    SRE_Import_asset("../resources/models/python_testing.smtl");
+    //SRE_Import_asset("../resources/models/python_testing.sarm");
+    //SRE_Import_asset("../resources/models/python_testing.smtl");
     SRE_Import_asset("../resources/models/python_testing.smsh");
 
-    SRE_Import_asset("../resources/models/checkerboard.smtl");
+    //SRE_Import_asset("../resources/models/checkerboard.smtl");
     SRE_Import_asset("../resources/models/checkerboard.smsh");
     SRE_Import_collision("../resources/models/checkerboard.scol");
 
@@ -122,7 +127,7 @@ int main(int argc, char **argv)
     SRE_Light_push_uniform_array(light1, program);
 
     sre_light *light2;
-    SRE_Light_create(&light2, "light2", (vec3){1.0f, 0.2f, 0.2f}, (sre_rgba)SRE_WHITE, 0.0f, true);
+    SRE_Light_create(&light2, "light2", (vec3){1.0f, -0.2f, 0.2f}, (sre_rgba)SRE_WHITE, 0.0f, true);
     SRE_Light_push_uniform_array(light2, program);
 
     const GLubyte* vendor = glGetString(GL_VENDOR);
@@ -156,6 +161,8 @@ int main(int argc, char **argv)
     SRE_Game_object_get("checkerboard_room", &room_mesh);
     SRE_Game_object_get("collision", &collision);
 
+    //glmc_rotate_x(room_mesh->mesh.model_mat, -GLM_PI_2, room_mesh->mesh.model_mat);
+
     sre_group *squishy, *room, *camera_group;
     SRE_Group_create(&squishy, "squishy_group");
     SRE_Group_create(&room, "room_group");
@@ -174,14 +181,15 @@ int main(int argc, char **argv)
     SRE_Group_add_component(squishy, squishy_mesh);
     squishy->collider = squishy_collider;
     sre_action wiggle;
-    SRE_Action_get_by_name(squishy_mesh->mesh.armature, "wiggle", &wiggle);
-    SRE_Action_set_active(&wiggle);
 
     SRE_Group_load(squishy);
     SRE_Group_load(room);
 
-    Uint64 now = SDL_GetPerformanceCounter();
+    SRE_Action_get_by_name(squishy_mesh->mesh.armature, "wiggle", &wiggle);
+    SRE_Action_set_active(&wiggle);
+
     SRE_App_start();
+    Uint64 now = SDL_GetPerformanceCounter();
     while (SRE_App_running())
     {
         cam_updated = 0;

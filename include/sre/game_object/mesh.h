@@ -23,11 +23,11 @@ typedef struct struct_sre_mesh
     mat4 model_mat;
     GLuint vao;
     GLuint vbo;
-    uint64_t vertex_count;
+    uint32_t vertex_count;
     vec3 *vertex_positions;
     sre_2_10_10_10s *vertex_normals;
-    uint64_t index_count;
-    uint64_t *vertex_indices;
+    uint32_t index_count;
+    uint32_t *vertex_indices;
     sre_norm_16_vec2 *uv_coordinates;
     sre_2_10_10_10s *polygon_normals;
     sre_rgba *vertex_colors;
@@ -35,8 +35,8 @@ typedef struct struct_sre_mesh
     ivec4 *bones;
     sre_material *material;
     sre_armature *armature;
-    char *material_name;
-    char *armature_name;
+    char material_name[64];
+    char armature_name[64];
 } sre_mesh;
 
 void SRE_Mesh_transform(sre_mesh *mesh, mat4 transform);

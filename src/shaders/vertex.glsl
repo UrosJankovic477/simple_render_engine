@@ -24,7 +24,7 @@ uniform uint inf_light_count = 0;
 uniform uint ka = 0xff3f3f3f;
 uniform uint kd = 0xff3f3f3f;
 uniform uint ks = 0xff3f3f3f;
-uniform float ns = 900.000000;
+uniform uint ns = 0xffff;
 uniform uint keyframe_count = 0;
 uniform float t_normalized;
 uniform mat4 bone_matrices_kf1[100];
@@ -40,15 +40,15 @@ void main(){
 
     vec4 nrms_kf1 = vec4(0.0f, 0.0f, 0.0f, 0.0f);
     vec4 nrms_kf2 = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-    
+
     vec4 pos_lerp;
     vec4 nrms_lerp;
 
     if(animated) {
-        for(uint i = 0; i < 4; i++) 
+        for(uint i = 0; i < 4; i++)
         {
             float w = w4[i];
-            if(w < 0.001) 
+            if(w < 0.001)
             {
                 continue;
             }
@@ -77,7 +77,7 @@ void main(){
     }
 
     vec4 model_pos = model * pos_lerp;
-    
+
     mat4 rot_only = model;
     rot_only[3] = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -91,7 +91,9 @@ void main(){
     lit = vec3(0.0f);
     spec = vec3(0.0f);
     vec3 vdir = normalize(-view_pos.xyz);
-    vec4 ks4 = unpackUnorm4x8(ks);
+    vec2 ks2 = unpackUnorm2x16(ks);
+    vec2 ns2 = unpackUnorm2x16(ns);
+    ns2.x *= 9000.0f;
 
     for(uint i = 0; i < inf_light_count; i++)
     {
@@ -100,11 +102,11 @@ void main(){
         vec4 colvec4 = unpackUnorm4x8(l.color);
         vec3 dir = l.position;
         float lproj = max(dot(model_nrms.xyz, dir), 0);
-        
+
         lit += clamp(colvec4.xyz * lproj, 0.0f, 1.0f);
         vec3 refl = 2 * lproj * model_nrms.xyz - dir;
 
-        vec3 tmp_spec = colvec4.xyz * ks4.x * pow(max(dot(normalize(refl), vdir), 0), ns);
+        vec3 tmp_spec = colvec4.xyz * ks2.x * pow(max(dot(normalize(refl), vdir), 0), ns2.x);
         spec += clamp(tmp_spec, 0.0f, 1.0f);
     }
 
@@ -119,12 +121,12 @@ void main(){
         vec3 dir = normalize(ray);
         float lproj = max(dot(model_nrms.xyz, dir), 0);
         float att = clamp((l.radius * 4) / (d * d), 0.0f, 1.0f);
-        
+
         lit += clamp(colvec4.xyz * lproj * att, 0.0f, 1.0f);
         vec3 refl = 2 * lproj * model_nrms.xyz - dir;
-        
+
         if(d * d * 0.25 >= l.radius) continue;
-        vec3 tmp_spec = colvec4.xyz * ks4.x * pow(max(dot(normalize(refl), vdir), 0), ns);
+        vec3 tmp_spec = colvec4.xyz * ks2.x * pow(max(dot(normalize(refl), vdir), 0), ns2.x);
         spec += clamp(tmp_spec, 0.0f, 1.0f);
     }
 

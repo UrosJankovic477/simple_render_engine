@@ -20,8 +20,8 @@ sre_keyframe;
 typedef struct struct_sre_action
 {
     char name[64];
-    uint32_t bone_count;
-    uint32_t keyframe_count;
+    uint16_t bone_count;
+    uint16_t keyframe_count;
     sre_keyframe *keyframes;
 }
 sre_action;

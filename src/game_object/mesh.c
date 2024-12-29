@@ -1,5 +1,6 @@
 #include <sre/game_object/mesh.h>
 #include <sre/game_object/group.h>
+#include <sre/game_object/game_object.h>
 #include <cglm/call/affine.h>
 #include <cglm/call/mat4.h>
 
@@ -15,6 +16,15 @@ int SRE_Mesh_load(sre_mesh *mesh)
     glGenVertexArrays(1, &mesh->vao);
     glBindVertexArray(mesh->vao);
     glGenBuffers(1, &mesh->vbo);
+
+    if (mesh->material == NULL)
+    {
+        SRE_Game_object_get(mesh->material_name, &mesh->material);
+    }
+    if (mesh->armature == NULL && mesh->armature_name[0] != '\0')
+    {
+        SRE_Game_object_get(mesh->armature_name, &mesh->armature);
+    }
 
     sre_vertex vertices[MAX_VERTEX_COUNT];
     for (size_t i = 0; i < mesh->index_count; i++)

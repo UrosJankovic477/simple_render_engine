@@ -1,5 +1,29 @@
 #include <sre/game_object/game_object.h>
 #include <sre/game_object/import/importer.h>
+#include <SDL2/SDL_endian.h>
+
+typedef enum enum_sre_keyword
+{
+    SRE_EMPTY,
+    SRE_UNDEFINED,
+    SRE_MESH,
+    SRE_USE_ARM,
+    SRE_USE_MTL,
+    SRE_ARM,
+    SRE_MTL,
+    SRE_DIFFUSE_TEX,
+    SRE_DIFFUSE,
+}
+sre_keyword;
+
+typedef struct struct_sre_token
+{
+    sre_keyword keyword;
+    const char *key;
+    uint8_t collision_idx;
+    uint8_t index;
+}
+sre_token;
 
 static sre_token token_table[64];
 
@@ -30,29 +54,13 @@ const char const *token_strings[] = {
 };
 
 const sre_keyword keywords[] = {
-    SRE_ENDOBJ,
     SRE_MESH,
-    SRE_TRANSFORM,
     SRE_USE_ARM,
     SRE_USE_MTL,
-    SRE_VTX_COUNT,
-    SRE_VCO,
-    SRE_VNORMAL,
-    SRE_VGROUP,
-    SRE_POLY_COUNT,
-    SRE_POLY,
     SRE_ARM,
-    SRE_BONE_COUNT,
-    SRE_ACT_COUNT,
-    SRE_ACT,
-    SRE_KF_COUNT,
-    SRE_KF,
     SRE_MTL,
     SRE_DIFFUSE_TEX,
     SRE_DIFFUSE,
-    SRE_SPECULAR,
-    SRE_SPECULAR_EXP,
-    SRE_EMISSION,
 };
 
 
@@ -154,268 +162,237 @@ int SRE_Get_keyword(const char *token_string, sre_keyword *keyword)
 
 int SRE_Armature_process(FILE *file, fpos_t *position, sre_armature *armature)
 {
-    char buffer[1028];
-    int64_t action_idx = -1, kf_idx = -1;
-    while (fgets(buffer, sizeof(buffer), file))
+    uint16_t bone_count, action_count;
+    fread(&bone_count, sizeof(uint16_t), 1, file);
+    fread(&action_count, sizeof(uint16_t), 1, file);
+    armature->action_count = SDL_SwapLE16(action_count);
+    int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions, armature->action_count * sizeof(sre_action));
+    if (status != SRE_SUCCESS)
     {
-        char *token = strtok(buffer, blank_chars);
-        sre_keyword keyword;
-        SRE_Get_keyword(token, &keyword);
-        switch (keyword)
-        {
-            case SRE_ACT_COUNT:
-            {
-                armature->action_count = atoi(strtok(NULL, blank_chars));
-                int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions, armature->action_count * sizeof(sre_action));
-                if (status != SRE_SUCCESS)
-                {
-                    return SRE_ERROR;
-                }
-
-                break;
-            }
-            case SRE_BONE_COUNT:
-            {
-                armature->bone_count = atoi(strtok(NULL, blank_chars));
-                break;
-            }
-            case SRE_ACT:
-                action_idx += 1;
-                kf_idx = -1;
-                const char *name = strtok(NULL, blank_chars);
-                strncpy(armature->actions[action_idx].name, name, 64);
-                armature->actions[action_idx].bone_count = armature->bone_count;
-                break;
-            case SRE_KF_COUNT:
-            {
-                armature->actions[action_idx].keyframe_count = atoi(strtok(NULL, blank_chars));
-                int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions[action_idx].keyframes, armature->actions[action_idx].keyframe_count * sizeof(sre_keyframe));
-                if (status != SRE_SUCCESS)
-                {
-                    return SRE_ERROR;
-                }
-                break;
-            }
-            case SRE_KF:
-            {
-
-                kf_idx += 1;
-                armature->actions[action_idx].keyframes[kf_idx].timestamp = atoi(strtok(NULL, blank_chars));
-                int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions[action_idx].keyframes[kf_idx].bone_matrices, armature->bone_count * 16 * sizeof(float));
-                if (status != SRE_SUCCESS)
-                {
-                    return SRE_ERROR;
-                }
-                for (size_t bone_idx = 0; bone_idx < armature->bone_count; bone_idx++)
-                {
-                    fgets(buffer, sizeof(buffer), file);
-                    strtok(buffer, blank_chars);
-                    for (size_t i = 0; i < 4; i++)
-                    {
-                        for (size_t j = 0; j < 4; j++)
-                        {
-                            armature->actions[action_idx].keyframes[kf_idx].bone_matrices[bone_idx][i][j] = atof(strtok(NULL, blank_chars));
-                        }
-                    }
-                }
-                break;
-            }
-            case SRE_ENDOBJ:
-                break;
-            default:
-                break;
-        }
+        return SRE_ERROR;
     }
-    return SRE_SUCCESS;
-}
 
-int SRE_Material_process(FILE *file, fpos_t *position, sre_material *material)
-{
-    char buffer[1028];
-    while (fgets(buffer, sizeof(buffer), file))
+    armature->bone_count = SDL_SwapLE16(bone_count);
+
+    for (uint16_t action_idx = 0; action_idx < action_count; action_idx++)
     {
-        char *token = strtok(buffer, blank_chars);
-        sre_keyword keyword;
-        SRE_Get_keyword(token, &keyword);
-        switch (keyword)
+        char buffer[64];
+        fgets(buffer, 64, file);
+        const char *name = strtok(buffer, blank_chars);
+        strncpy(armature->actions[action_idx].name, name, 64);
+        armature->actions[action_idx].bone_count = armature->bone_count;
+
+        uint16_t keyframe_count;
+        fread(&keyframe_count, sizeof(uint16_t), 1, file);
+        armature->actions[action_idx].keyframe_count = SDL_SwapLE16(keyframe_count);
+        int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions[action_idx].keyframes, armature->actions[action_idx].keyframe_count * sizeof(sre_keyframe));
+        if (status != SRE_SUCCESS)
         {
-            case SRE_DIFFUSE_TEX:
-            {
-
-                char *texture_name = strtok(NULL, blank_chars);
-                sre_game_object *texture_object;
-                SRE_Game_object_create(texture_name, &texture_object);
-                texture_object->base.go_type = SRE_GO_TEXTURE;
-                int status = SRE_Load_texture(texture_name, &texture_object->texture);
-                if (status != SRE_SUCCESS)
-                {
-                    strncpy(texture_object->base.name, texture_name, 64);
-                    SRE_Bump_alloc(&main_allocator, &texture_object->texture, sizeof(sre_texture));
-                    const char *extension = ".png";
-                    char texture_path[256] = "../resources/textures/";
-                    strncat(texture_path, texture_name, 256);
-                    strncat(texture_path, extension, 256);
-                    status = SRE_Load_texture(texture_path, &texture_object->texture);
-                    if (status != SRE_SUCCESS)
-                    {
-                        return status;
-                    }
-                }
-
-                material->map_Kd = &texture_object->texture;
-                break;
-            }
-            case SRE_DIFFUSE:
-            {
-
-                float r = atof(strtok(NULL, blank_chars));
-                float g = atof(strtok(NULL, blank_chars));
-                float b = atof(strtok(NULL, blank_chars));
-                material->Kd = SRE_Vec3_to_rgb(r, g, b);
-                break;
-            }
-            case SRE_SPECULAR:
-            {
-                float ks = atof(strtok(NULL, blank_chars));
-                material->Ks = SRE_Float_to_unorm_8(ks);
-                break;
-            }
-            case SRE_EMISSION:
-            {
-                float r = atof(strtok(NULL, blank_chars));
-                float g = atof(strtok(NULL, blank_chars));
-                float b = atof(strtok(NULL, blank_chars));
-                material->Ke = SRE_Vec3_to_rgb(r, g, b);
-                break;
-            }
-            case SRE_SPECULAR_EXP:
-            {
-                float ns = atof(strtok(NULL, blank_chars));
-                material->Ns = ns;
-                break;
-            }
-            default:
-                break;
+            return SRE_ERROR;
         }
-    }
-    return SRE_SUCCESS;
-}
-
-int SRE_Mesh_process(FILE *file, fpos_t *position, sre_mesh *mesh)
-{
-    char buffer[1028];
-    uint64_t vco_idx = 0, vnormal_idx = 0, vgroup_idx = 0, vidx_idx = 0;
-    while (fgets(buffer, sizeof(buffer), file))
-    {
-        char *token = strtok(buffer, blank_chars);
-        sre_keyword keyword;
-        SRE_Get_keyword(token, &keyword);
-        sre_game_object *object;
-        switch (keyword)
+        for (uint16_t kf_idx = 0; kf_idx < keyframe_count; kf_idx++)
         {
-            case SRE_USE_ARM:
+            uint32_t timestamp;
+            fread(&timestamp, sizeof(uint32_t), 1, file);
+            armature->actions[action_idx].keyframes[kf_idx].timestamp = SDL_SwapLE16(timestamp);
+            int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions[action_idx].keyframes[kf_idx].bone_matrices, armature->bone_count * 16 * sizeof(float));
+            if (status != SRE_SUCCESS)
             {
-                const char* arm_name = strtok(NULL, blank_chars);
-                int status = SRE_Game_object_get(arm_name, &object);
-                if (status != SRE_SUCCESS)
-                {
-                    return SRE_ERROR;
-                }
-                mesh->armature = &object->armature;
-                break;
+                return SRE_ERROR;
             }
-            case SRE_USE_MTL:
-            {
-                const char* mtl_name = strtok(NULL, blank_chars);
-                int status = SRE_Game_object_get(mtl_name, &object);
-                if (status != SRE_SUCCESS)
-                {
-                    return SRE_ERROR;
-                }
-                mesh->material = &object->material;
-                break;
-            }
-            case SRE_VTX_COUNT:
-            {
-                mesh->vertex_count = atoi(strtok(NULL, blank_chars));
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->vertex_positions, mesh->vertex_count * sizeof(sre_float_vec3));
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->vertex_normals, mesh->vertex_count * sizeof(sre_2_10_10_10s));
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->bones, mesh->vertex_count * sizeof(ivec4));
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->weights, mesh->vertex_count * sizeof(vec4));
-                break;
-            }
-            case SRE_VCO:
-            {
-                mesh->vertex_positions[vco_idx][0] = atof(strtok(NULL, blank_chars));
-                mesh->vertex_positions[vco_idx][1] = atof(strtok(NULL, blank_chars));
-                mesh->vertex_positions[vco_idx][2] = atof(strtok(NULL, blank_chars));
-                vco_idx++;
-                break;
-            }
-            case SRE_VNORMAL:
-            {
-                float nx = atof(strtok(NULL, blank_chars));
-                float ny = atof(strtok(NULL, blank_chars));
-                float nz = atof(strtok(NULL, blank_chars));
-                mesh->vertex_normals[vnormal_idx] = SRE_Float_to_2_10_10_10s(nx, ny, nz);
-                vnormal_idx++;
-                break;
-            }
-            case SRE_VGROUP:
-            {
-                uint32_t vgroup_count = atoi(strtok(NULL, blank_chars));
-                glm_vec4_zero(mesh->weights[vgroup_idx]);
-                glm_ivec4_zero(mesh->bones[vgroup_idx]);
-                for (size_t i = 0; i < vgroup_count; i++)
-                {
-                    mesh->bones[vgroup_idx][i] = atoi(strtok(NULL, blank_chars));
-                    mesh->weights[vgroup_idx][i] = atof(strtok(NULL, blank_chars));
-                }
-                vgroup_idx++;
-                break;
-            }
-            case SRE_POLY_COUNT:
-            {
-                uint64_t poly_count_count = atoi(strtok(NULL, blank_chars));
-                mesh->index_count = poly_count_count * 3;
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->vertex_indices, mesh->index_count * sizeof(uint64_t));
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->polygon_normals, mesh->index_count * sizeof(sre_2_10_10_10s));
-                SRE_Bump_alloc(&main_allocator, (void**)&mesh->uv_coordinates, mesh->index_count * sizeof(sre_norm_16_vec2));
-                break;
-            }
-            case SRE_POLY:
-            {
-                for (size_t i = 0; i < 3; i++)
-                {
-                    mesh->vertex_indices[vidx_idx + i] = atoi(strtok(NULL, blank_chars));
-                    mesh->uv_coordinates[vidx_idx + i].x = SRE_Float_to_unorm_16(atof(strtok(NULL, " ")));
-                    mesh->uv_coordinates[vidx_idx + i].y = SRE_Float_to_unorm_16(atof(strtok(NULL, " ")));
-                }
-                float x = atof(strtok(NULL, blank_chars));
-                float y = atof(strtok(NULL, blank_chars));
-                float z = atof(strtok(NULL, blank_chars));
-                mesh->polygon_normals[vidx_idx] = SRE_Float_to_2_10_10_10s(x, y, z);
-                mesh->polygon_normals[vidx_idx + 1] = mesh->polygon_normals[vidx_idx];
-                mesh->polygon_normals[vidx_idx + 2] = mesh->polygon_normals[vidx_idx];
-                vidx_idx += 3;
-                break;
-            }
-            case SRE_TRANSFORM:
+            for (size_t bone_idx = 0; bone_idx < armature->bone_count; bone_idx++)
             {
                 for (size_t i = 0; i < 4; i++)
                 {
                     for (size_t j = 0; j < 4; j++)
                     {
-                        mesh->model_mat[i][j] = atof(strtok(NULL, blank_chars));
+                        float mat_element;
+                        fread(&mat_element, sizeof(float), 1, file);
+                        armature->actions[action_idx].keyframes[kf_idx].bone_matrices[bone_idx][i][j] = SDL_SwapLE16(mat_element);
                     }
                 }
-                break;
             }
-            default:
-                break;
         }
-
     }
+
+    return SRE_SUCCESS;
+}
+
+int SRE_Material_process(FILE *file, fpos_t *position, sre_material *material)
+{
+    uint8_t keyword;
+    fread(&keyword, sizeof(uint8_t), 1, file);
+
+    //Diffuse
+    switch (keyword)
+    {
+        case SRE_DIFFUSE_TEX:
+        {
+            char buffer[256];
+            fgets(buffer, 256, file);
+            char *texture_name = strtok(buffer, blank_chars);
+            sre_game_object *texture_object;
+            SRE_Game_object_create(texture_name, &texture_object);
+            texture_object->base.go_type = SRE_GO_TEXTURE;
+            int status = SRE_Load_texture(texture_name, &texture_object->texture);
+            if (status != SRE_SUCCESS)
+            {
+                strncpy(texture_object->base.name, texture_name, 64);
+                SRE_Bump_alloc(&main_allocator, &texture_object->texture, sizeof(sre_texture));
+                const char *extension = ".png";
+                char texture_path[256] = "../resources/textures/";
+                strncat(texture_path, texture_name, 256);
+                strncat(texture_path, extension, 256);
+                status = SRE_Load_texture(texture_path, &texture_object->texture);
+                if (status != SRE_SUCCESS)
+                {
+                    return status;
+                }
+            }
+            material->map_Kd = &texture_object->texture;
+            break;
+        }
+        case SRE_DIFFUSE:
+        {
+            uint8_t rgba[4];
+            fread(rgba, sizeof(uint8_t), 4, file);
+            material->Kd.r = rgba[0];
+            material->Kd.g = rgba[1];
+            material->Kd.b = rgba[2];
+            material->Kd.a = rgba[3];
+            break;
+        }
+        default:
+            return SRE_ERROR;
+    }
+
+    //Specular
+    uint16_t specular[2];
+    fread(specular, sizeof(uint16_t), 2, file);
+    material->Ks = SDL_SwapLE16(specular[0]);
+    material->Ns = SDL_SwapLE16(specular[1]);
+
+    //Emission
+    uint8_t em_rgb[3];
+    fread(em_rgb, sizeof(uint8_t), 3, file);
+    material->Ke.r = em_rgb[0];
+    material->Ke.g = em_rgb[1];
+    material->Ke.b = em_rgb[2];
+    material->Ke.a = 255;
+
+    return SRE_SUCCESS;
+}
+
+int SRE_Mesh_process(FILE *file, fpos_t *position, sre_mesh *mesh)
+{
+    uint64_t vco_idx = 0, vnormal_idx = 0, vgroup_idx = 0, vidx_idx = 0;
+    // Transform
+    for (size_t i = 0; i < 4; i++)
+    {
+        for (size_t j = 0; j < 4; j++)
+        {
+            float mat_element;
+            fread(&mat_element, sizeof(float), 1, file);
+            mesh->model_mat[i][j] = SDL_SwapFloatLE(mat_element);
+        }
+    }
+    uint8_t keyword;
+    fread(&keyword, sizeof(uint8_t), 1, file);
+
+    // Armature
+    char buffer[64];
+    if (keyword == SRE_USE_ARM)
+    {
+        sre_game_object *armature;
+        fgets(buffer, 64, file);
+        const char* arm_name = strtok(buffer, blank_chars);
+        int status = SRE_Game_object_get(arm_name, &armature);
+        strncpy(mesh->armature_name, arm_name, 64);
+        mesh->armature = &armature->armature;
+        fread(&keyword, sizeof(uint8_t), 1, file);
+    }
+    else
+    {
+        mesh->armature = NULL;
+        mesh->armature_name[0] = '\0';
+    }
+
+
+    // Material
+    if (keyword == SRE_USE_MTL)
+    {
+        sre_game_object *material;
+        fgets(buffer, 64, file);
+        const char* mtl_name = strtok(buffer, blank_chars);
+        int status = SRE_Game_object_get(mtl_name, &material);
+        strncpy(mesh->material_name, mtl_name, 64);
+        mesh->material = &material->material;
+    }
+
+    // Get number of vertices
+    uint32_t vertex_count;
+    fread(&vertex_count, sizeof(uint32_t), 1, file);
+    mesh->vertex_count = SDL_SwapLE16(vertex_count);
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->vertex_positions, mesh->vertex_count * sizeof(sre_float_vec3));
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->vertex_normals, mesh->vertex_count * sizeof(sre_2_10_10_10s));
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->bones, mesh->vertex_count * sizeof(ivec4));
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->weights, mesh->vertex_count * sizeof(vec4));
+
+    // Vertices
+    for (uint32_t i = 0; i < vertex_count; i++)
+    {
+        float xyz[3];
+        fread(xyz, sizeof(float), 3, file);
+        mesh->vertex_positions[i][0] = SDL_SwapFloatLE(xyz[0]);
+        mesh->vertex_positions[i][1] = SDL_SwapFloatLE(xyz[1]);
+        mesh->vertex_positions[i][2] = SDL_SwapFloatLE(xyz[2]);
+        sre_2_10_10_10s normal;
+        fread(&normal, sizeof(sre_2_10_10_10s), 1, file);
+        mesh->vertex_normals[i] = SDL_SwapLE32(normal);
+        uint8_t vgroup_count;
+        fread(&vgroup_count, sizeof(uint8_t), 1, file);
+        glm_vec4_zero(mesh->weights[i]);
+        glm_ivec4_zero(mesh->bones[i]);
+        for (uint8_t j = 0; j < vgroup_count; j++)
+        {
+            uint32_t group;
+            float weight;
+            fread(&group, sizeof(uint32_t), 1, file);
+            fread(&weight, sizeof(float), 1, file);
+            mesh->bones[i][j] = SDL_SwapLE32(group);
+            mesh->weights[i][j] = SDL_SwapFloatLE(weight);
+        }
+    }
+
+    // Polygons
+    uint32_t poly_count_count;
+    fread(&poly_count_count, sizeof(uint32_t), 1, file);
+
+    uint32_t index_count = SDL_SwapLE32(poly_count_count) * 3;
+    mesh->index_count = index_count;
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->vertex_indices, mesh->index_count * sizeof(uint32_t));
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->polygon_normals, mesh->index_count * sizeof(sre_2_10_10_10s));
+    SRE_Bump_alloc(&main_allocator, (void**)&mesh->uv_coordinates, mesh->index_count * sizeof(sre_norm_16_vec2));
+
+    for (size_t i = 0; i < index_count; i += 3)
+    {
+        for (size_t j = 0; j < 3; j++)
+        {
+            uint32_t vertex_index;
+            uint16_t uv[2];
+            fread(&vertex_index, sizeof(uint32_t), 1, file);
+            fread(uv, sizeof(uint16_t), 2, file);
+            mesh->vertex_indices[i + j] = SDL_SwapLE32(vertex_index);
+            mesh->uv_coordinates[i + j].x = SDL_SwapLE16(uv[0]);
+            mesh->uv_coordinates[i + j].y = SDL_SwapLE16(uv[1]);
+        }
+        sre_2_10_10_10s poly_normal;
+        fread(&poly_normal, sizeof(sre_2_10_10_10s), 1, file);
+        mesh->polygon_normals[i] = SDL_SwapLE32(poly_normal);
+        mesh->polygon_normals[i + 1] = mesh->polygon_normals[i];
+        mesh->polygon_normals[i + 2] = mesh->polygon_normals[i];
+    }
+
     return SRE_SUCCESS;
 }
 
@@ -439,19 +416,18 @@ int SRE_Import_asset(const char *filepath)
     }
     char *filename;
     size_t filepath_len = strlen(filepath);
-    char buffer[1028];
-    while (fgets(buffer, sizeof(buffer), file))
+    uint8_t keyword;
+    while (fread(&keyword, sizeof(uint8_t), 1, file))
     {
-        char *token = strtok(buffer, blank_chars);
-        sre_keyword keyword;
         sre_game_object *object;
         fpos_t position;
-        SRE_Get_keyword(token, &keyword);
         switch (keyword)
         {
         case SRE_MESH:
         {
-            const char *name = strtok(NULL, blank_chars);
+            char buffer[64];
+            fgets(buffer, 64, file);
+            const char *name = strtok(buffer, blank_chars);
             SRE_Game_object_create(name, &object);
             object->base.go_type = SRE_GO_MESH;
 
@@ -466,7 +442,9 @@ int SRE_Import_asset(const char *filepath)
 
         case SRE_MTL:
         {
-            const char *name = strtok(NULL, blank_chars);
+            char buffer[64];
+            fgets(buffer, 64, file);
+            const char *name = strtok(buffer, blank_chars);
             SRE_Game_object_create(name, &object);
             object->base.go_type = SRE_GO_MATERIAL;
 
@@ -481,7 +459,9 @@ int SRE_Import_asset(const char *filepath)
 
         case SRE_ARM:
         {
-            const char *name = strtok(NULL, blank_chars);
+            char buffer[64];
+            fgets(buffer, 64, file);
+            const char *name = strtok(buffer, blank_chars);
             SRE_Game_object_create(name, &object);
             object->base.go_type = SRE_GO_ARMATURE;
 
@@ -524,7 +504,6 @@ int SRE_Import_collision(const char *filepath)
     uint16_t size;
     fread(&size, sizeof(uint16_t), 1, file);
     collider->data.bsp_tree.size = size;
-
     SRE_Bump_alloc(&main_allocator, (void**)&collider->data.bsp_tree.tree, size * sizeof(sre_bsp_node));
     for (size_t i = 0; i < size; i++)
     {

@@ -34,7 +34,7 @@ sre_game_object;
 
 int SRE_Object_queue_enqueue();
 
-int SRE_Game_object_manager_init(size_t always_loaded_assets_size, size_t current_zone_assets_size);
+int SRE_Game_object_manager_init();
 int SRE_Game_object_get(const char *name, sre_game_object **object);
 int SRE_Game_object_create(const char *name, sre_game_object **out_object_ptr);
 int SRE_Game_object_remove(const char *name);

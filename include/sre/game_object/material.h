@@ -13,17 +13,17 @@
 
 #define SRE_MATERIAL_TABLE_SIZE 256
 
-typedef struct struct_sre_material 
+typedef struct struct_sre_material
 {
     sre_game_object_base base;
     sre_rgba Kd;
-    uint8_t Ks;
     sre_rgba Ke;
-    float Ns;
+    uint16_t Ns;
+    uint16_t Ks;
     sre_texture *map_Kd;
-} 
+}
 sre_material;
 
 int SRE_Material_bind(sre_material *mtl, sre_program program);
 
-#endif 
+#endif
