@@ -15,7 +15,6 @@ typedef struct struct_sre_texture
     GLint height;
     GLint nChannels;
     GLubyte *data;
-    char *path; 
 }
 sre_texture;
 

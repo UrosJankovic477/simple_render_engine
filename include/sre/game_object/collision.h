@@ -74,7 +74,7 @@ typedef struct struct_sre_collider
 }
 sre_collider;
 
-int SRE_Collider_create(sre_collider *col, sre_collider_data data);
+int SRE_Collider_create_aabb(sre_collider **collider, const char *name, vec3 min_pt, vec3 max_pt);
 int SRE_Copy_collider(sre_collider *src, sre_collider *dest);
 
 int SRE_Collider_get_next_in_queue(sre_collider **col);

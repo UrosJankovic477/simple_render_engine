@@ -1,166 +1,8 @@
 #include <sre/game_object/game_object.h>
-#include <sre/game_object/import/importer.h>
+#include <sre/game_object/import_export/importer.h>
 #include <SDL2/SDL_endian.h>
 
-typedef enum enum_sre_keyword
-{
-    SRE_EMPTY,
-    SRE_UNDEFINED,
-    SRE_MESH,
-    SRE_USE_ARM,
-    SRE_USE_MTL,
-    SRE_ARM,
-    SRE_MTL,
-    SRE_DIFFUSE_TEX,
-    SRE_DIFFUSE,
-}
-sre_keyword;
-
-typedef struct struct_sre_token
-{
-    sre_keyword keyword;
-    const char *key;
-    uint8_t collision_idx;
-    uint8_t index;
-}
-sre_token;
-
-static sre_token token_table[64];
-
-const char const *token_strings[] = {
-    "endobj",
-    "mesh",
-    "transform",
-    "use_arm",
-    "use_mtl",
-    "vtx_count",
-    "vco",
-    "vnormal",
-    "vgroup",
-    "poly_count",
-    "poly",
-    "arm",
-    "bone_count",
-    "act_count",
-    "act",
-    "kf_count",
-    "kf",
-    "mtl",
-    "diffuse_tex",
-    "diffuse",
-    "specular",
-    "specular_exp",
-    "emission",
-};
-
-const sre_keyword keywords[] = {
-    SRE_MESH,
-    SRE_USE_ARM,
-    SRE_USE_MTL,
-    SRE_ARM,
-    SRE_MTL,
-    SRE_DIFFUSE_TEX,
-    SRE_DIFFUSE,
-};
-
-
-unsigned char SRE_Get_token_hash(const char *keyword)
-{
-    char hash = 0;
-    char c;
-    while (c = *keyword++)
-    {
-        hash = hash ^ c;
-
-    }
-
-    return hash & 0x3f; // hash % 64
-}
-
-int SRE_Add_token(sre_token* token_table, const char *token_string, sre_keyword type)
-{
-    unsigned char hash = SRE_Get_token_hash(token_string);
-    sre_token node = token_table[hash];
-    if (node.keyword == SRE_EMPTY)
-    {
-        node.key = token_string;
-        node.index = hash;
-        node.collision_idx = 255;
-        node.keyword = type;
-        token_table[hash] = node;
-        return SRE_SUCCESS;
-    }
-    uint8_t collision_idx = node.collision_idx;
-    while (collision_idx != 255)
-    {
-        hash = collision_idx;
-        collision_idx = token_table[hash].collision_idx;
-    }
-
-    uint8_t i = 1;
-    uint8_t old_hash = hash;
-    do {
-        hash = (hash + i++) & 0x3f; // hash % 64
-    }
-    while (token_table[hash].keyword != SRE_EMPTY || hash == old_hash);
-
-    if (hash == old_hash)
-    {
-        return SRE_ERROR;
-    }
-    token_table[old_hash].collision_idx = hash;
-    token_table[hash].key = token_string;
-    token_table[hash].index = hash;
-    token_table[hash].collision_idx = -1;
-    token_table[hash].keyword = type;
-
-    return SRE_SUCCESS;
-
-}
-
-int SRE_Importer_init(char **token_strings, sre_keyword *keywords, int keywords_count, size_t always_loaded_assets_size, size_t current_zone_assets_size)
-{
-    for (size_t i = 0; i < 64; i++)
-    {
-        token_table[i].keyword = SRE_EMPTY;
-    }
-
-    for (size_t i = 0; i < keywords_count; i++)
-    {
-        SRE_Add_token(token_table, token_strings[i], keywords[i]);
-    }
-
-    return SRE_SUCCESS;
-}
-
-int SRE_Importer_init_default()
-{
-    size_t always_loaded_assets_size = main_allocator.size / 3;
-    return SRE_Importer_init(token_strings, keywords, 23, always_loaded_assets_size, main_allocator.size - always_loaded_assets_size);
-}
-
-int SRE_Get_keyword(const char *token_string, sre_keyword *keyword)
-{
-    uint8_t hash = SRE_Get_token_hash(token_string);
-    uint8_t old_hash = hash;
-    sre_token node = token_table[hash];
-    while (strcmp(node.key, token_string) != 0)
-    {
-        hash = node.collision_idx;
-        if (node.collision_idx == 255)
-        {
-            *keyword = SRE_UNDEFINED;
-            return SRE_SUCCESS;
-        }
-
-        node = token_table[hash];
-    }
-
-    *keyword = node.keyword;
-    return SRE_SUCCESS;
-}
-
-int SRE_Armature_process(FILE *file, fpos_t *position, sre_armature *armature)
+int SRE_Armature_process(FILE *file, sre_armature *armature)
 {
     uint16_t bone_count, action_count;
     fread(&bone_count, sizeof(uint16_t), 1, file);
@@ -195,7 +37,7 @@ int SRE_Armature_process(FILE *file, fpos_t *position, sre_armature *armature)
             uint32_t timestamp;
             fread(&timestamp, sizeof(uint32_t), 1, file);
             armature->actions[action_idx].keyframes[kf_idx].timestamp = SDL_SwapLE16(timestamp);
-            int status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions[action_idx].keyframes[kf_idx].bone_matrices, armature->bone_count * 16 * sizeof(float));
+            status = SRE_Bump_alloc(&main_allocator, (void**)&armature->actions[action_idx].keyframes[kf_idx].bone_matrices, armature->bone_count * 16 * sizeof(float));
             if (status != SRE_SUCCESS)
             {
                 return SRE_ERROR;
@@ -218,7 +60,7 @@ int SRE_Armature_process(FILE *file, fpos_t *position, sre_armature *armature)
     return SRE_SUCCESS;
 }
 
-int SRE_Material_process(FILE *file, fpos_t *position, sre_material *material)
+int SRE_Material_process(FILE *file, sre_material *material)
 {
     uint8_t keyword;
     fread(&keyword, sizeof(uint8_t), 1, file);
@@ -226,14 +68,13 @@ int SRE_Material_process(FILE *file, fpos_t *position, sre_material *material)
     //Diffuse
     switch (keyword)
     {
-        case SRE_DIFFUSE_TEX:
+        case SRE_KW_DIFFUSE_TEX:
         {
             char buffer[256];
             fgets(buffer, 256, file);
             char *texture_name = strtok(buffer, blank_chars);
             sre_game_object *texture_object;
-            SRE_Game_object_create(texture_name, &texture_object);
-            texture_object->base.go_type = SRE_GO_TEXTURE;
+            SRE_Game_object_create(texture_name, SRE_GO_TEXTURE, &texture_object);
             int status = SRE_Load_texture(texture_name, &texture_object->texture);
             if (status != SRE_SUCCESS)
             {
@@ -252,7 +93,7 @@ int SRE_Material_process(FILE *file, fpos_t *position, sre_material *material)
             material->map_Kd = &texture_object->texture;
             break;
         }
-        case SRE_DIFFUSE:
+        case SRE_KW_DIFFUSE:
         {
             uint8_t rgba[4];
             fread(rgba, sizeof(uint8_t), 4, file);
@@ -283,9 +124,10 @@ int SRE_Material_process(FILE *file, fpos_t *position, sre_material *material)
     return SRE_SUCCESS;
 }
 
-int SRE_Mesh_process(FILE *file, fpos_t *position, sre_mesh *mesh)
+int SRE_Mesh_process(FILE *file, sre_mesh *mesh)
 {
     uint64_t vco_idx = 0, vnormal_idx = 0, vgroup_idx = 0, vidx_idx = 0;
+    mesh->vao = mesh->vbo = mesh->loaded_incatnce_count = 0;
     // Transform
     for (size_t i = 0; i < 4; i++)
     {
@@ -300,14 +142,17 @@ int SRE_Mesh_process(FILE *file, fpos_t *position, sre_mesh *mesh)
     fread(&keyword, sizeof(uint8_t), 1, file);
 
     // Armature
-    char buffer[64];
-    if (keyword == SRE_USE_ARM)
+    char buffer[256];
+    if (keyword == SRE_KW_USE_ARM)
     {
         sre_game_object *armature;
         fgets(buffer, 64, file);
         const char* arm_name = strtok(buffer, blank_chars);
-        int status = SRE_Game_object_get(arm_name, &armature);
-        strncpy(mesh->armature_name, arm_name, 64);
+        strcpy(mesh->armature_name, arm_name);
+        fgets(buffer, 256, file);
+        const char* arm_path = strtok(buffer, blank_chars);
+        strncpy(mesh->armature_path, arm_path, 256);
+        SRE_Game_object_get_or_import(mesh->armature_name, mesh->armature_path, &armature);
         mesh->armature = &armature->armature;
         fread(&keyword, sizeof(uint8_t), 1, file);
     }
@@ -319,13 +164,16 @@ int SRE_Mesh_process(FILE *file, fpos_t *position, sre_mesh *mesh)
 
 
     // Material
-    if (keyword == SRE_USE_MTL)
+    if (keyword == SRE_KW_USE_MTL)
     {
         sre_game_object *material;
         fgets(buffer, 64, file);
         const char* mtl_name = strtok(buffer, blank_chars);
-        int status = SRE_Game_object_get(mtl_name, &material);
         strncpy(mesh->material_name, mtl_name, 64);
+        fgets(buffer, 256, file);
+        const char* mtl_path = strtok(buffer, blank_chars);
+        strncpy(mesh->material_path, mtl_path, 256);
+        SRE_Game_object_get_or_import(mesh->material_name, mesh->material_path, &material);
         mesh->material = &material->material;
     }
 
@@ -401,38 +249,34 @@ int SRE_Import_asset(const char *filepath)
     FILE *file = fopen(filepath, "rb");
     if (!file)
     {
-        fprintf(stderr, "Can't open %s\n", filepath);
-        return SRE_ERROR;
+        char new_filepath[256] = "../resources/models/";
+        strncat(new_filepath, filepath, 256 - 21);
+        file = fopen(new_filepath, "rb");
+        if (!file)
+        {
+            fprintf(stderr, "Can't open %s\n", filepath);
+            return SRE_ERROR;
+        } 
     }
     uint16_t mesh_array_size = 0;
     uint16_t mesh_idx = 0;
-    char directory[256];
-    unsigned long long last_slash = strrchr(filepath, '/');
-    uint8_t directory_size = ((last_slash - (unsigned long long)filepath) + 1);
-    directory_size = directory_size < 256 ? directory_size : 256;
-    if (last_slash)
-    {
-        strncpy(directory, filepath, directory_size);
-    }
-    char *filename;
-    size_t filepath_len = strlen(filepath);
+
     uint8_t keyword;
     while (fread(&keyword, sizeof(uint8_t), 1, file))
     {
         sre_game_object *object;
-        fpos_t position;
         switch (keyword)
         {
-        case SRE_MESH:
+        case SRE_KW_MESH:
         {
             char buffer[64];
             fgets(buffer, 64, file);
             const char *name = strtok(buffer, blank_chars);
-            SRE_Game_object_create(name, &object);
-            object->base.go_type = SRE_GO_MESH;
+            SRE_Game_object_create(name, SRE_GO_MESH, &object);
+            strncpy(object->base.path, filepath, 256);
 
-            fgetpos(file, &position);
-            int status =  SRE_Mesh_process(file, &position, &object->mesh);
+
+            int status =  SRE_Mesh_process(file, &object->mesh);
             if (status != SRE_SUCCESS)
             {
                 return status;
@@ -440,16 +284,15 @@ int SRE_Import_asset(const char *filepath)
             break;
         }
 
-        case SRE_MTL:
+        case SRE_KW_MTL:
         {
             char buffer[64];
             fgets(buffer, 64, file);
             const char *name = strtok(buffer, blank_chars);
-            SRE_Game_object_create(name, &object);
-            object->base.go_type = SRE_GO_MATERIAL;
+            SRE_Game_object_create(name, SRE_GO_MATERIAL, &object);
+            strncpy(object->base.path, filepath, 256);
 
-            fgetpos(file, &position);
-            int status =  SRE_Material_process(file, &position, &object->material);
+            int status =  SRE_Material_process(file, &object->material);
             if (status != SRE_SUCCESS)
             {
                 return status;
@@ -457,21 +300,37 @@ int SRE_Import_asset(const char *filepath)
             break;
         }
 
-        case SRE_ARM:
+        case SRE_KW_ARM:
         {
             char buffer[64];
             fgets(buffer, 64, file);
             const char *name = strtok(buffer, blank_chars);
-            SRE_Game_object_create(name, &object);
-            object->base.go_type = SRE_GO_ARMATURE;
+            SRE_Game_object_create(name, SRE_GO_ARMATURE, &object);
+            strncpy(object->base.path, filepath, 256);
 
-            fpos_t position;
-            fgetpos(file, &position);
-            int status =  SRE_Armature_process(file, &position, &object->armature);
+            int status =  SRE_Armature_process(file, &object->armature);
             if (status != SRE_SUCCESS)
             {
                 return status;
             }
+            break;
+        }
+
+        case SRE_KW_COLLIDER:
+        {
+            char buffer[64];
+            fgets(buffer, 64, file);
+            const char *name = strtok(buffer, blank_chars);
+            SRE_Game_object_create(name, SRE_GO_COLLIDER, (sre_game_object**)&object);
+            strncpy(object->base.path, filepath, 256);
+            SRE_Process_collision(file, (sre_collider*)object);
+            break;
+        }
+
+        case SRE_KW_GROUP:
+        {
+            object = SRE_Group_import_from_file(file);
+            
             break;
         }
 
@@ -484,21 +343,9 @@ int SRE_Import_asset(const char *filepath)
     return SRE_SUCCESS;
 }
 
-int SRE_Import_collision(const char *filepath)
+int SRE_Process_collision(FILE *file, sre_collider * collider)
 {
-    FILE *file = fopen(filepath, "rb");
-    if (!file)
-    {
-        fprintf(stderr, "Can't open %s\n", filepath);
-        return SRE_ERROR;
-    }
-    sre_game_object *collider_object;
-    char buffer[64];
-    fgets(buffer, 64, file);
-    const char *name = strtok(buffer, blank_chars);
-    SRE_Game_object_create(name, &collider_object);
-    collider_object->base.go_type = SRE_GO_COLLIDER;
-    sre_collider *collider = &collider_object->collider;
+    
     collider->type = SRE_COLLIDER_BSP_TREE;
 
     uint16_t size;

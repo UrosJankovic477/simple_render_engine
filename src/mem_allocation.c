@@ -5,6 +5,8 @@ sre_bumpalloc main_allocator;
 int SRE_Bump_reset(sre_bumpalloc *bump)
 {
     bump->index = 0;
+    bump->freelist.head = NULL;
+    bump->freelist.tail = NULL;
     return SRE_SUCCESS;
 }
 
@@ -22,43 +24,49 @@ int SRE_Bump_alloc(sre_bumpalloc *bump, void **dest, size_t size)
 
     // checking freelist
 
-    if (size <= bump->freelist.largest_free_block)
+    if (size <= bump->freelist.largest_free_size)
     {
-        sre_freelist_entry *current_free_block = bump->freelist.head;
-        sre_freelist_entry *prev_free_block = NULL;
-        while (current_free_block)
+        sre_freelist_entry *current_node = bump->freelist.head;
+        sre_freelist_entry *prev_node = NULL;
+        while (current_node && size > current_node->size)
         {
-            if (current_free_block->size >= size)
-            {
-                *dest = (uint8_t *)current_free_block;
-                sre_freelist_entry *next_free_block;
-                if (size == current_free_block->size)
-                {
-                    next_free_block = current_free_block->next;
-                }
-                else
-                {
-                    next_free_block = current_free_block + size;
-                    next_free_block->size = current_free_block->size - size;
-                    next_free_block->next = current_free_block->next;
-                }
-
-
-                if (prev_free_block == NULL)
-                {
-                    bump->freelist.head = next_free_block;
-                }
-                else
-                {
-                    prev_free_block->next = next_free_block;
-                }
-                return SRE_SUCCESS;
-            }
-
-            prev_free_block = current_free_block;
-            current_free_block = current_free_block->next;
+            prev_node = current_node;
+            current_node = current_node->next;
         }
-        return SRE_ERROR; // shouldn't be possible
+        if (prev_node == NULL)
+        {
+            *dest = (void*)bump->freelist.head;
+            bump->freelist.head = bump->freelist.head->next;
+            if (bump->freelist.head == NULL)
+            {
+                bump->freelist.tail = NULL;
+                bump->freelist.largest_free_size = 0;
+            }
+            
+            
+        }
+        else if (current_node != NULL)
+        {
+            prev_node->next = current_node->next;
+            if (current_node->size == bump->freelist.largest_free_size)
+            {
+                bump->freelist.largest_free_size = ~0;
+            }
+            
+            if (current_node->next == NULL)
+            {
+                bump->freelist.tail = prev_node;
+            }
+            
+            *dest = current_node;
+        }
+        else
+        {
+            *dest = (uint8_t *)bump->data + bump->index;
+            bump->index += size;
+            return SRE_SUCCESS;
+        }
+        return SRE_SUCCESS;
     }
 
     // if there's no free space in freelist just do normal bump aloc
@@ -70,22 +78,43 @@ int SRE_Bump_alloc(sre_bumpalloc *bump, void **dest, size_t size)
 
 int SRE_Bump_free(sre_bumpalloc *bump, void **block, size_t size)
 {
-    if (*block + size == bump->index)
+    size_t size_mod16 = size & 0xf;
+    if (size_mod16)
     {
-        bump -= size;
+        size += 16 - size_mod16;
+    }
+
+    if (*block + size == bump->index + bump->data)
+    {
+        bump->index -= size;
         *block = NULL;
         return SRE_SUCCESS;
     }
 
-    sre_freelist_entry *next_node = bump->freelist.head;
-    bump->freelist.head = (sre_freelist_entry *)(*block);
-    bump->freelist.head->size = size;
-    bump->freelist.head->next = next_node;
-    if (size > bump->freelist.largest_free_block)
-    {
-        bump->freelist.largest_free_block = size;
-    }
+    
 
+    if (bump->freelist.head == NULL)
+    {
+        bump->freelist.head = ((sre_freelist_entry*) *block);
+        bump->freelist.tail = bump->freelist.head;
+        bump->freelist.head->next = NULL;
+        bump->freelist.head->size = size;
+        bump->freelist.largest_free_size = size;
+        return SRE_SUCCESS;
+    }
+    else
+    {
+        bump->freelist.tail->next = ((sre_freelist_entry*) *block);
+        bump->freelist.tail->next->next = NULL;
+        bump->freelist.tail->next->size = size;
+        bump->freelist.tail = bump->freelist.tail->next;
+        if (bump->freelist.largest_free_size == ~0 || bump->freelist.largest_free_size < size)
+        {
+            bump->freelist.largest_free_size = size;
+        }
+        
+    }
+    
     *block = NULL;
 
     return SRE_SUCCESS;
@@ -102,7 +131,7 @@ int SRE_Bump_create(sre_bumpalloc *bump, size_t size)
     bump->index = 0;
     bump->size = size;
     bump->freelist.head = NULL;
-    bump->freelist.largest_free_block = 0;
+    bump->freelist.tail = NULL;
     return SRE_SUCCESS;
 }
 
@@ -112,6 +141,6 @@ int SRE_Bump_destroy(sre_bumpalloc *bump)
     bump->data = NULL;
     bump->index = -1;
     bump->freelist.head = NULL;
-    bump->freelist.largest_free_block = 0;
+    bump->freelist.tail = NULL;
     return SRE_SUCCESS;
 }

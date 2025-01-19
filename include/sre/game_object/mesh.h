@@ -20,6 +20,7 @@
 typedef struct struct_sre_mesh
 {
     sre_game_object_base base;
+    uint32_t loaded_incatnce_count;
     mat4 model_mat;
     GLuint vao;
     GLuint vbo;
@@ -37,11 +38,14 @@ typedef struct struct_sre_mesh
     sre_armature *armature;
     char material_name[64];
     char armature_name[64];
-} sre_mesh;
+    char material_path[256];
+    char armature_path[256];
+} 
+sre_mesh;
 
 void SRE_Mesh_transform(sre_mesh *mesh, mat4 transform);
 int SRE_Mesh_load(sre_mesh *mesh);
 int SRE_Mesh_unload(sre_mesh *mesh);
-int SRE_Mesh_draw(sre_mesh *mesh, sre_program program);
+int SRE_Mesh_draw(sre_mesh *mesh, sre_program *program);
 
 #endif

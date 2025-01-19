@@ -82,11 +82,13 @@ int SRE_Mesh_load(sre_mesh *mesh)
 int SRE_Mesh_unload(sre_mesh *mesh)
 {
     glDeleteBuffers(1, &(mesh->vbo));
+    mesh->vbo = 0;
     glDeleteVertexArrays(1, &(mesh->vao));
+    mesh->vao = 0;
     return 0;
 }
 
-int SRE_Mesh_draw(sre_mesh *mesh, sre_program program)
+int SRE_Mesh_draw(sre_mesh *mesh, sre_program *program)
 {
     sre_material *mtl = mesh->material;
     sre_armature *arm = mesh->armature;
@@ -94,11 +96,11 @@ int SRE_Mesh_draw(sre_mesh *mesh, sre_program program)
 
     if (arm)
     {
-        glUniform1ui(SRE_Get_uniform_location(&program, "animated"), true);
+        glUniform1ui(SRE_Get_uniform_location(program, "animated"), true);
     }
     else
     {
-        glUniform1ui(SRE_Get_uniform_location(&program, "animated"), false);
+        glUniform1ui(SRE_Get_uniform_location(program, "animated"), false);
     }
 
     glBindVertexArray(mesh->vao);
@@ -112,7 +114,7 @@ int SRE_Mesh_draw(sre_mesh *mesh, sre_program program)
     mat4 model;
     glmc_mat4_mul(mesh->base.parent_transform_mat, mesh->model_mat, model);
 
-    glUniformMatrix4fv(SRE_Get_uniform_location(&program, "model"), 1, GL_FALSE, model);
+    glUniformMatrix4fv(SRE_Get_uniform_location(program, "model"), 1, GL_FALSE, model);
     SRE_Material_bind(mtl, program);
 
     glDrawArrays(GL_TRIANGLES, 0, mesh->index_count);

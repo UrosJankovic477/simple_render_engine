@@ -43,6 +43,8 @@ typedef struct struct_sre_control_listener
 }
 sre_control_listener;
 
+extern sre_control_listener main_control_listener;
+
 void SRE_Control_create(sre_control_listener *listener, float speed, float sensitivity, sre_control_handler control_handler);
 int SRE_Control_handler_default(SDL_Event event, float dt);
 void SRE_Control_update(sre_control_listener *listenter);

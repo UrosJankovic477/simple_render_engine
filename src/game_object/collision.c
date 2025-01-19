@@ -11,9 +11,18 @@ enum
     BSP_SOLID = 0xfffe,
 };
 
-int SRE_Collider_create(sre_collider *col, sre_collider_data data)
+int SRE_Collider_create_aabb(sre_collider **collider, const char *name, vec3 min_pt, vec3 max_pt)
 {
-    col->data = data;
+    int status = SRE_Game_object_create(name, SRE_GO_COLLIDER, (sre_game_object**)collider);
+    if (status != SRE_SUCCESS)
+    {
+        return status;
+    }
+    
+    (*collider)->type = SRE_COLLIDER_AABB;
+    glmc_vec3_copy(max_pt, (*collider)->data.aabb.max_pt);
+    glmc_vec3_copy(min_pt, (*collider)->data.aabb.min_pt);
+
 
     return EXIT_SUCCESS;
 }
@@ -388,8 +397,7 @@ bool SRE_Aabb_from_mesh(sre_mesh mesh, sre_collider **collider)
     char name[64];
     strncpy(name, mesh.base.name, 58);
     strcat(name, "_aabb");
-    SRE_Game_object_create(name, (sre_game_object**)collider);
-    (*collider)->base.go_type = SRE_GO_COLLIDER;
+    SRE_Game_object_create(name, SRE_GO_COLLIDER, (sre_game_object**)collider);
     (*collider)->type = SRE_COLLIDER_AABB;
     glmc_vec3_copy(mesh.vertex_positions[0], (*collider)->data.aabb.min_pt);
     glmc_vec3_copy(mesh.vertex_positions[0], (*collider)->data.aabb.max_pt);

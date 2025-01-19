@@ -9,7 +9,7 @@
 #include <sre/game_object/group.h>
 #include <sre/game_object/game_object.h>
 #include <sre/game_object/camera.h>
-#include <sre/game_object/import/importer.h>
+#include <sre/game_object/import_export/importer.h>
 #include <sre/mem_allocation.h>
 #include <sre/types.h>
 #include <sre/shaders.h>

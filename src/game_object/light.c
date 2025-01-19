@@ -8,8 +8,7 @@
 
 void SRE_Light_create(sre_light **light, const char *name, vec3 translation, sre_rgba color, float radius, bool directional)
 {
-    SRE_Game_object_create(name, (sre_game_object**)light);
-    (*light)->base.go_type = SRE_GO_LIGHT;
+    SRE_Game_object_create(name, SRE_GO_LIGHT, (sre_game_object**)light);
     glmc_vec3_copy(translation, (*light)->translation);
     (*light)->radius = radius;
     (*light)->color = color;

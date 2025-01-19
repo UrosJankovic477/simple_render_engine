@@ -8,26 +8,27 @@
 #define SRE_QUEUE_SIZE 1028
 #define SRE_QUEUE_FREELIST_SIZE (SRE_QUEUE_SIZE >> 6)
 
-#ifndef SRE_GROUP_H
-typedef struct struct_sre_group sre_group;
-#endif
 
 typedef enum enum_sre_object_type
 {
-    SRE_GO_NULL = 0,
-    SRE_GO_MESH = 1,
-    SRE_GO_ARMATURE = 2,
-    SRE_GO_MATERIAL = 4,
-    SRE_GO_TEXTURE = 8,
-    SRE_GO_COLLIDER = 16,
-    SRE_GO_CONTROL_LISTENER = 32,
-    SRE_GO_GROUP = 64,
-    SRE_GO_CAMERA = 128,
-    SRE_GO_LIGHT = 256,
+    SRE_GO_NULL             = 0,
+    SRE_GO_USER             = 1 << 31,
+    SRE_GO_MESH             = 1,
+    SRE_GO_ARMATURE         = 1 << 1,
+    SRE_GO_MATERIAL         = 1 << 2,
+    SRE_GO_TEXTURE          = 1 << 3,
+    SRE_GO_COLLIDER         = 1 << 4,
+    SRE_GO_ASSET_INSANCE    = 1 << 5,
+    SRE_GO_GROUP            = 1 << 6,
+    SRE_GO_CAMERA           = 1 << 7,
+    SRE_GO_LIGHT            = 1 << 8,
+    SRE_GO_SCENE            = 1 << 9,
 }
 sre_object_type;
 
 typedef union union_sre_game_object sre_game_object;
+
+typedef struct struct_sre_group sre_group;
 
 typedef struct struct_sre_object_list_entry_data
 {
@@ -39,30 +40,37 @@ typedef struct struct_sre_object_list_entry_data
 }
 sre_object_list_entry_data;
 
+typedef struct struct_sre_object_list sre_list;
+
 typedef struct struct_sre_object_list_entry
 {
     sre_game_object *game_object;
     struct struct_sre_object_list_entry *next;
     struct struct_sre_object_list_entry *prev;
+    sre_list *list;
 }
-sre_object_list_entry;
+sre_list_entry;
 
 typedef struct struct_sre_object_list
 {
-    sre_object_list_entry *head;
-    sre_object_list_entry *tail;
+    sre_list_entry *head;
+    sre_list_entry *tail;
+    uint16_t count;
+    uint16_t parent_id;
 }
-sre_object_list;
+sre_list;
 
-typedef struct struct_sre_group sre_group;
+typedef union union_sre_internalnode sre_internalnode;
 
 typedef struct struct_sre_object_base
 {
-    sre_object_type go_type;
-    sre_group *parent;
+    sre_object_type type;
     uint16_t id;
     uint16_t queue_index;
     char name[64];
+    char path[256];
+    sre_list_entry *entry;
+    sre_internalnode *parent;
     mat4 parent_transform_mat;
 }
 sre_game_object_base;

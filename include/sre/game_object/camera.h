@@ -20,7 +20,8 @@ typedef struct struct_sre_camera
     mat4 proj;
     vec3 translation;
     vec3 direction;
-    vec3 *lookat;
+    char lookat_name[64];
+    sre_group *lookat;
     vec3 lookat_offset;
     float fovy;
     float nearz;
@@ -28,6 +29,8 @@ typedef struct struct_sre_camera
     float asprat;
 }
 sre_camera;
+
+extern sre_camera *main_camera;
 
 #ifdef __cplusplus
 extern "C" {

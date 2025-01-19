@@ -2,7 +2,7 @@
 #include <sre/event/event.h>
 #define USE_MATH_DEFINES
 
-static sre_control_listener *main_control_listener = NULL;
+sre_control_listener main_control_listener;
 
 #define SRE_CONTROL_FLAG_FORWARD             (1)
 #define SRE_CONTROL_FLAG_BACK                (1 << 1)
@@ -58,6 +58,16 @@ void SRE_Keyboard_handler_translate(sre_control_listener *listener, float dt)
         SRE_App_quit();
         return;
     }
+    if (keyboard_state[SDL_SCANCODE_F12])
+    {
+        SRE_Scene_export("../resources/scenes/scene.scn");
+    }
+    if (keyboard_state[SDL_SCANCODE_F11])
+    {
+        SRE_Scene_import("../resources/scenes/scene.scn");
+    }
+    
+    
     listener->distance = dt * listener->velocity;
     listener->control_flags &= SRE_CONTROL_SETTINGS_FLAGS | SRE_CONTROL_FLAG_MOUSE_MOTION;
     for (size_t i = 0; i < SRE_CONTROL_ACTION_COUNT; i++)
@@ -83,12 +93,12 @@ int SRE_Control_handler_default(SDL_Event event, float dt)
 {
     if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP)
     {
-        SRE_Keyboard_handler_translate(main_control_listener, dt);
+        SRE_Keyboard_handler_translate(&main_control_listener, dt);
         return SRE_SUCCESS;
     }
     else if (event.type == SDL_MOUSEMOTION)
     {
-        SRE_Mouse_movement_handler_rotate_xy(event, main_control_listener, dt);
+        SRE_Mouse_movement_handler_rotate_xy(event, &main_control_listener, dt);
         return SRE_SUCCESS;
     }
     else if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP)
@@ -195,10 +205,5 @@ void SRE_Control_update(sre_control_listener *listener)
 
 void SRE_Controls_handler(SDL_Event event, float dt)
 {
-    main_control_listener->control_handler(event, dt);
-}
-
-void SRE_Control_listener_set_main(sre_control_listener *listener)
-{
-    main_control_listener = listener;
+    main_control_listener.control_handler(event, dt);
 }

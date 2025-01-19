@@ -11,4 +11,6 @@ enum
     SRE_LOGGING_VERBOSITY_2,    // logs everything
 };
 
+void SRE_Log(const char *str);
+
 #endif //SRE_LOG_H

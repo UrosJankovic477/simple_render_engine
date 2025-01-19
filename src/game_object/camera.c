@@ -3,10 +3,11 @@
 #include <sre/game_object/group.h>
 #include <math.h>
 
+sre_camera *main_camera = NULL;
+
 void SRE_Camera_create(sre_camera **camera, const char *name, vec3 translation, vec3 direction, float nearz, float farz, float asprat, float fovy)
 {
-    SRE_Game_object_create(name, (sre_game_object**)camera);
-    (*camera)->base.go_type = SRE_GO_CAMERA;
+    SRE_Game_object_create(name, SRE_GO_CAMERA, (sre_game_object**)camera);
     glmc_vec3_copy(translation, (*camera)->translation);
     glmc_vec3_normalize(direction);
     glmc_vec3_copy(direction, (*camera)->direction);
@@ -17,6 +18,7 @@ void SRE_Camera_create(sre_camera **camera, const char *name, vec3 translation, 
     (*camera)->fovy = fovy;
     (*camera)->proj_uniform = 0;
     (*camera)->view_uniform = 0;
+    (*camera)->lookat = NULL;
     glm_mat4_identity((*camera)->view);
     glm_mat4_identity((*camera)->proj);
 }
@@ -28,7 +30,7 @@ void SRE_Camera_set_view_mat(sre_camera *cam)
     glmc_mat4_mulv3(cam->base.parent_transform_mat, cam->translation, 1.0f, translation);
 
     vec3 lookat;
-    glmc_vec3_add(*cam->lookat, cam->lookat_offset, lookat);
+    glmc_vec3_add(cam->lookat->transform.translation, cam->lookat_offset, lookat);
     //glmc_look(translation, cam->direction, (vec3){0.0f, 1.0f, 0.0f}, cam->view);
     glmc_lookat(translation, lookat, (vec3){0.0f, 1.0f, 0.0f}, cam->view);
 }

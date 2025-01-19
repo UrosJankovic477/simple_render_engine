@@ -24,6 +24,6 @@ typedef struct struct_sre_material
 }
 sre_material;
 
-int SRE_Material_bind(sre_material *mtl, sre_program program);
+int SRE_Material_bind(sre_material *mtl, sre_program *program);
 
 #endif

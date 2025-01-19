@@ -14,9 +14,9 @@ sre_freelist_entry;
 
 typedef struct struct_sre_freelist
 {
-    uint64_t length;
-    size_t largest_free_block;
+    size_t largest_free_size;
     sre_freelist_entry *head;
+    sre_freelist_entry *tail;
 }
 sre_freelist;
 

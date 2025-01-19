@@ -11,9 +11,9 @@
 
 typedef enum enum_sre_light_type
 {
-    SRE_POINT_LIGHT,
-    SRE_DIRECTIONAL_LIGHT,
-    SRE_SPOTLIGHT,
+    SRE_POINT_LIGHT = 1,
+    SRE_DIRECTIONAL_LIGHT = 2,
+    SRE_SPOTLIGHT = 4,
 }
 sre_light_type;
 
@@ -24,7 +24,7 @@ typedef struct struct_sre_light
     sre_rgba color;
     float radius;
     int idx;
-    sre_light_type type;
+    uint8_t type;
 }
 sre_light;
 

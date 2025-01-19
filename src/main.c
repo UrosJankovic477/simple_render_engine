@@ -80,12 +80,8 @@ int main(int argc, char **argv)
 
     glUseProgram(program.id);
 
-    sre_camera *main_camera;
-    sre_control_listener main_control_listener;
-
     SRE_Camera_create(&main_camera, "main_camera", (vec3) {0, 0, 8}, (vec3) {0, 0, 0}, 0.01f, 200.0f, ((float)width / (float)height), glm_rad(70.0f));
     SRE_Control_create(&main_control_listener, 10, 0.5, SRE_Control_handler_default);
-    SRE_Control_listener_set_main(&main_control_listener);
 
     // temporarely hardcode keyboard configuration
 
@@ -97,14 +93,13 @@ int main(int argc, char **argv)
     main_control_listener.keyboard_config[SRE_CONTORL_ACTION_UP] = SDL_SCANCODE_SPACE;
     main_control_listener.keyboard_config[SRE_CONTROL_ACTION_DOWN] = SDL_SCANCODE_LSHIFT;
 
-    SRE_Importer_init_default();
-    //SRE_Import_asset("../resources/models/python_testing.sarm");
-    //SRE_Import_asset("../resources/models/python_testing.smtl");
+    SRE_Import_asset("../resources/models/python_testing.sarm");
+    SRE_Import_asset("../resources/models/python_testing.smtl");
     SRE_Import_asset("../resources/models/python_testing.smsh");
 
-    //SRE_Import_asset("../resources/models/checkerboard.smtl");
+    SRE_Import_asset("../resources/models/checkerboard.smtl");
     SRE_Import_asset("../resources/models/checkerboard.smsh");
-    SRE_Import_collision("../resources/models/checkerboard.scol");
+    SRE_Import_asset("../resources/models/checkerboard.scol");
 
     //SRE_Camera_set_view_mat(main_camera);
     SRE_Camera_set_proj_mat(main_camera);
@@ -167,26 +162,46 @@ int main(int argc, char **argv)
     SRE_Group_create(&squishy, "squishy_group");
     SRE_Group_create(&room, "room_group");
     //SRE_Group_create(&camera_group, "camera_group");
-    main_camera->lookat = &squishy->transform.translation;
+    main_camera->lookat = squishy;
 
     SRE_Group_add_component(squishy, (sre_game_object*)main_camera);
     main_control_listener.moving_object = squishy;
 
-    SRE_Group_add_component(room, room_mesh);
+    sre_transform identity;
+    SRE_Trans_identity(&identity);
+    sre_asset_instance *room_mesh_instance;
+    SRE_Asset_create_instance(room_mesh, identity, NULL, &room_mesh_instance);
+    SRE_Group_add_component(room, room_mesh_instance);
     SRE_Group_add_component(room, collision);
-
 
     sre_collider *squishy_collider;
     SRE_Aabb_from_mesh(squishy_mesh->mesh, &squishy_collider);
-    SRE_Group_add_component(squishy, squishy_mesh);
+    sre_asset_instance *squishy_mesh_instance;
+    SRE_Asset_create_instance(squishy_mesh, identity, NULL, &squishy_mesh_instance);
+    SRE_Group_add_component(squishy, squishy_mesh_instance);
     squishy->collider = squishy_collider;
     sre_action wiggle;
 
-    SRE_Group_load(squishy);
-    SRE_Group_load(room);
+    sre_asset_instance *squishy_instance, *room_instance;
+    SRE_Asset_create_instance(squishy, identity, NULL, &squishy_instance);
+    SRE_Asset_create_instance(room, identity, NULL, &room_instance);
+
+    SRE_Group_load(squishy, ~0);
+    SRE_Group_load(room, ~0);
+
+    SRE_Scene_reset();
+
+    SRE_Scene_add_component(squishy);
+    SRE_Scene_add_component(room);
+    //SRE_Asset_instance_load(squishy_instance);
+    //SRE_Asset_instance_load(room_instance);
 
     SRE_Action_get_by_name(squishy_mesh->mesh.armature, "wiggle", &wiggle);
     SRE_Action_set_active(&wiggle);
+
+
+    SRE_Group_export("../resources/room_group.grp", room);
+    SRE_Group_export("../resources/squishy_group.grp", squishy);
 
     SRE_App_start();
     Uint64 now = SDL_GetPerformanceCounter();
@@ -246,15 +261,15 @@ int main(int argc, char **argv)
         glUniform1ui(SRE_Get_uniform_location(&program, "time"), now);
         SRE_Set_current_keyframes(program, now);
         // Draw here
-        SRE_Group_draw(room, program, SRE_GO_MESH);
-        SRE_Group_draw(squishy, program, SRE_GO_MESH);
+        SRE_Scene_draw(&program, SRE_GO_MESH | SRE_GO_GROUP | SRE_GO_ASSET_INSANCE);
+
+        SRE_Camera_set_view_mat(main_camera);
 
         SRE_Draw_to_main_framebuffer(postproc_framebuffer, postproc_program, width, height);
         SRE_Framebuffer_bind(postproc_framebuffer, program.id);
         SDL_GL_SwapWindow(window);
     }
-    SRE_Group_unload(room);
-    SRE_Group_unload(squishy);
+    SRE_Scene_reset();
     SDL_DestroyWindow(window);
     SDL_Quit();
     printf("deleting shader programs...   ");
